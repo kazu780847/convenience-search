@@ -1,0 +1,386 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>全国 日帰り温泉・温浴施設マップ</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      color: #333;
+    }
+    /* 温泉らしい落ち着いた和風の紺碧色 */
+    header {
+      background-color: #1a446c;
+      color: #fff;
+      padding: 12px 20px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    /* サイドバー */
+    .sidebar {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      background: #fdfdfd;
+      border-right: 1px solid #ddd;
+      z-index: 5;
+    }
+    .search-panel {
+      padding: 16px;
+      background: #f4f6f8;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button {
+      padding: 8px 14px;
+      background: #1a446c;
+      border: none;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0f2c47;
+    }
+    .btn-current {
+      background: #c05621; /* 温泉らしいあたたかみのある橙色 */
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .btn-current:hover {
+      background: #9c4215;
+    }
+    /* 施設カテゴリ別チップ */
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip {
+      padding: 6px 12px;
+      border-radius: 16px;
+      border: 1px solid #ccc;
+      background: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      color: #555;
+    }
+    .chip.active {
+      background: #1a446c;
+      color: #fff;
+      border-color: #1a446c;
+    }
+    /* 施設一覧リスト */
+    .results-list {
+      flex: 1;
+      overflow-y: auto;
+      list-style: none;
+    }
+    .place-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .place-item:hover {
+      background: #f0f4f8;
+    }
+    .place-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #1a446c;
+      margin-bottom: 4px;
+    }
+    .place-vicinity {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    #map {
+      flex: 1;
+      height: 100%;
+    }
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column-reverse;
+      }
+      .sidebar {
+        width: 100%;
+        height: 45vh;
+      }
+      #map {
+        height: 55vh;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span>♨️ 全国 日帰り温泉・温浴施設マップ</span>
+  </header>
+
+  <div class="container">
+    <div class="sidebar">
+      <div class="search-panel">
+        <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺の温泉を検索</button>
+        <div class="input-group">
+          <input type="text" id="targetArea" placeholder="地名・駅名・温泉地 (例: 草津温泉, 田沢湖駅)">
+          <button id="btnAreaSearch">移動</button>
+        </div>
+        <div class="filter-chips">
+          <button class="chip active" data-query="日帰り温泉 銭湯 立ち寄り湯">すべて</button>
+          <button class="chip" data-query="日帰り温泉">日帰り温泉</button>
+          <button class="chip" data-query="スーパー銭湯">スーパー銭湯</button>
+          <button class="chip" data-query="足湯">足湯</button>
+          <button class="chip" data-query="共同浴場 共同湯">共同浴場</button>
+        </div>
+      </div>
+      <ul class="results-list" id="resultsList">
+        <li style="padding: 20px; text-align: center; color: #888;">
+          検索中...
+        </li>
+      </ul>
+    </div>
+
+    <div id="map"></div>
+  </div>
+
+  <script>
+    let map;
+    let infoWindow;
+    let markers = [];
+    let currentQuery = '日帰り温泉 銭湯 立ち寄り湯';
+    let searchTimeout = null;
+    let geocoder;
+    let currentMunicipality = '';
+
+    const DEFAULT_LOCATION = { lat: 35.681236, lng: 139.767125 };
+
+    async function initMap() {
+      const { Map, InfoWindow } = await google.maps.importLibrary("maps");
+
+      map = new Map(document.getElementById('map'), {
+        center: DEFAULT_LOCATION,
+        zoom: 13,
+        mapTypeControl: false,
+        fullscreenControl: true,
+        streetViewControl: false
+      });
+
+      infoWindow = new InfoWindow();
+      geocoder = new google.maps.Geocoder();
+
+      map.addListener('idle', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          searchBathSpots();
+        }, 500);
+      });
+
+      setupEventListeners();
+    }
+
+    function setupEventListeners() {
+      // 現在地取得
+      document.getElementById('btnCurrentLocation').addEventListener('click', () => {
+        document.getElementById('targetArea').value = '';
+        currentMunicipality = '';
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const userLocation = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+              };
+              map.setCenter(userLocation);
+              map.setZoom(14);
+            },
+            () => alert('現在地の取得に失敗しました。位置情報の利用を許可してください。')
+          );
+        } else {
+          alert('お使いのブラウザは位置情報取得に対応していません。');
+        }
+      });
+
+      // エリア・温泉地名検索
+      document.getElementById('btnAreaSearch').addEventListener('click', () => {
+        const areaName = document.getElementById('targetArea').value.trim();
+        if (!areaName) return;
+
+        geocoder.geocode({ address: areaName }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            map.setCenter(results[0].geometry.location);
+            map.setZoom(13);
+
+            if (areaName.endsWith('市') || areaName.endsWith('町') || areaName.endsWith('村') || areaName.endsWith('区')) {
+              currentMunicipality = areaName.replace(/(市|町|村|区)$/, '');
+            } else {
+              currentMunicipality = '';
+            }
+          } else {
+            alert('場所が見つかりませんでした: ' + status);
+          }
+        });
+      });
+
+      document.getElementById('targetArea').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          document.getElementById('btnAreaSearch').click();
+        }
+      });
+
+      // フィルター切り替え
+      document.querySelectorAll('.chip').forEach(button => {
+        button.addEventListener('click', (e) => {
+          document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          currentQuery = e.target.getAttribute('data-query');
+          searchBathSpots();
+        });
+      });
+    }
+
+    // 温浴施設検索処理 (Places API New)
+    async function searchBathSpots() {
+      clearMarkers();
+      const resultsList = document.getElementById('resultsList');
+      resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺の温浴施設を検索中...</li>';
+
+      try {
+        const { Place } = await google.maps.importLibrary("places");
+
+        const request = {
+          textQuery: currentQuery,
+          fields: ['displayName', 'location', 'formattedAddress'],
+          locationBias: {
+            center: map.getCenter(),
+            radius: 6000 // 温泉施設は点在するため半径6kmと広めに設定
+          },
+          maxResultCount: 20
+        };
+
+        const { places } = await Place.searchByText(request);
+
+        resultsList.innerHTML = '';
+        if (places && places.length > 0) {
+          let displayPlaces = places;
+
+          // 市町村名での指定がある場合のみ絞り込み
+          if (currentMunicipality) {
+            const filtered = displayPlaces.filter(p => {
+              const addr = p.formattedAddress || '';
+              const name = p.displayName || '';
+              return addr.includes(currentMunicipality) || name.includes(currentMunicipality);
+            });
+            if (filtered.length > 0) {
+              displayPlaces = filtered;
+            }
+          }
+
+          displayPlaces.forEach((place, index) => {
+            createMarker(place);
+            appendPlaceToList(place, index);
+          });
+        } else {
+          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">この周辺に該当する温泉・温浴施設は見つかりませんでした。</li>';
+        }
+      } catch (err) {
+        console.error(err);
+        resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中にエラーが発生しました。</li>';
+      }
+    }
+
+    function createMarker(place) {
+      const marker = new google.maps.Marker({
+        map: map,
+        position: place.location,
+        title: place.displayName
+      });
+
+      marker.addListener('click', () => {
+        showInfoWindow(marker, place);
+      });
+
+      markers.push(marker);
+    }
+
+    function showInfoWindow(marker, place) {
+      const name = place.displayName || '';
+      const address = place.formattedAddress || '';
+      const content = `
+        <div style="padding: 6px; font-size: 13px; max-width: 240px;">
+          <strong style="color: #1a446c;">♨️ ${name}</strong><br>
+          <span style="color:#555; display:inline-block; margin-top:4px;">${address}</span>
+        </div>
+      `;
+      infoWindow.setContent(content);
+      infoWindow.open(map, marker);
+    }
+
+    function appendPlaceToList(place, index) {
+      const list = document.getElementById('resultsList');
+      const li = document.createElement('li');
+      li.className = 'place-item';
+
+      li.innerHTML = `
+        <div class="place-title">♨️ ${place.displayName}</div>
+        <div class="place-vicinity">${place.formattedAddress || '住所情報なし'}</div>
+      `;
+
+      li.addEventListener('click', () => {
+        map.panTo(place.location);
+        if (markers[index]) {
+          showInfoWindow(markers[index], place);
+        }
+      });
+
+      list.appendChild(li);
+    }
+
+    function clearMarkers() {
+      markers.forEach(m => m.setMap(null));
+      markers = [];
+    }
+  </script>
+
+  <!-- Google Maps API 読み込み (先ほどと同じAPIキーを使用) -->
+  <script 
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&v=weekly&libraries=places&callback=initMap" 
+    async defer>
+  </script>
+</body>
+</html>
