@@ -153,12 +153,12 @@
       <div class="search-panel">
         <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺を検索</button>
         <div class="input-group">
-          <input type="text" id="targetArea" placeholder="地名・市区町村名 (例: 田沢湖駅, 伊奈町)">
+          <input type="text" id="targetArea" placeholder="地名・市区町村名 (例: 青森駅, 伊奈町)">
           <button id="btnAreaSearch">移動</button>
         </div>
         <div class="filter-chips">
           <button class="chip active" data-chain="ALL">すべて</button>
-          <button class="chip" data-chain="セブン">セブン</button>
+          <button class="chip" data-chain="セブン-イレブン">セブン</button>
           <button class="chip" data-chain="ファミリーマート">ファミマ</button>
           <button class="chip" data-chain="ローソン">ローソン</button>
         </div>
@@ -180,6 +180,7 @@
     let currentChain = 'ALL';
     let searchTimeout = null;
     let geocoder;
+    let currentMunicipality = ''; // 自治体フィルター用（伊奈町などの絞り込み）
 
     const DEFAULT_LOCATION = { lat: 35.681236, lng: 139.767125 };
 
@@ -211,6 +212,7 @@
       // 現在地取得
       document.getElementById('btnCurrentLocation').addEventListener('click', () => {
         document.getElementById('targetArea').value = '';
+        currentMunicipality = '';
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
@@ -237,6 +239,13 @@
           if (status === 'OK' && results[0]) {
             map.setCenter(results[0].geometry.location);
             map.setZoom(14);
+
+            // 市・町・村での検索時のみ自治体フィルターを設定（駅名検索時はフィルターしない）
+            if (areaName.endsWith('市') || areaName.endsWith('町') || areaName.endsWith('村') || areaName.endsWith('区')) {
+              currentMunicipality = areaName.replace(/(市|町|村|区)$/, '');
+            } else {
+              currentMunicipality = '';
+            }
           } else {
             alert('場所が見つかりませんでした: ' + status);
           }
@@ -266,22 +275,18 @@
       const resultsList = document.getElementById('resultsList');
       resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中...</li>';
 
-      const searchInput = document.getElementById('targetArea').value.trim();
-
       try {
         const { Place } = await google.maps.importLibrary("places");
         
-        let queryWord = currentChain === 'ALL' ? 'コンビニエンスストア' : currentChain;
-        if (searchInput) {
-          queryWord = searchInput + ' ' + queryWord;
-        }
+        // 検索キーワードはチェーン指定時のみその単語（純粋に周辺座標から探す）
+        const queryWord = currentChain === 'ALL' ? 'コンビニエンスストア' : currentChain;
 
         const request = {
           textQuery: queryWord,
           fields: ['displayName', 'location', 'formattedAddress'],
           locationBias: {
             center: map.getCenter(),
-            radius: 3000
+            radius: 3500 // 周辺を広くカバー
           },
           maxResultCount: 20
         };
@@ -292,24 +297,23 @@
         if (places && places.length > 0) {
           let displayPlaces = places;
 
-          // 各チェーン指定時: 店舗名に指定キーワードが入っている店舗のみ抽出
+          // 1. 各チェーン指定時: 店舗名に確実に該当ブランドが含まれるものだけに厳密一致
           if (currentChain !== 'ALL') {
             displayPlaces = displayPlaces.filter(p => {
               const name = p.displayName || '';
-              if (currentChain === 'セブン') return name.includes('セブン');
+              if (currentChain === 'セブン-イレブン') return name.includes('セブン');
               if (currentChain === 'ファミリーマート') return name.includes('ファミリーマート') || name.includes('ファミマ');
               if (currentChain === 'ローソン') return name.includes('ローソン');
               return true;
             });
           }
 
-          // 市区町村が入力されている場合の住所絞り込み
-          if (searchInput) {
-            const cleanKey = searchInput.replace(/(駅|市|町|村)$/, '');
+          // 2. 伊奈町などの自治体指定がある場合のみ、他市町村の店舗を除外
+          if (currentMunicipality) {
             const filteredByArea = displayPlaces.filter(p => {
               const addr = p.formattedAddress || '';
               const name = p.displayName || '';
-              return addr.includes(cleanKey) || name.includes(cleanKey);
+              return addr.includes(currentMunicipality) || name.includes(currentMunicipality);
             });
             if (filteredByArea.length > 0) {
               displayPlaces = filteredByArea;
@@ -322,14 +326,14 @@
               appendPlaceToList(place, index);
             });
           } else {
-            resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">条件に該当するコンビニは見つかりませんでした。</li>';
+            resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺に該当する店舗は見つかりませんでした。</li>';
           }
         } else {
           resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺にコンビニが見つかりませんでした。</li>';
         }
       } catch (err) {
         console.error(err);
-        resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索の取得中にエラーが発生しました。</li>';
+        resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中にエラーが発生しました。</li>';
       }
     }
 
