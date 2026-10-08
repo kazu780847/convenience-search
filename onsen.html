@@ -157,11 +157,11 @@
           <button id="btnAreaSearch">移動</button>
         </div>
         <div class="filter-chips">
-          <button class="chip active" data-query="温泉 銭湯 立ち寄り湯">すべて</button>
-          <button class="chip" data-query="日帰り温泉 温泉">日帰り温泉</button>
-          <button class="chip" data-query="スーパー銭湯">スーパー銭湯</button>
-          <button class="chip" data-query="足湯">足湯</button>
-          <button class="chip" data-query="共同浴場 共同湯">共同浴場</button>
+          <button class="chip active" data-keyword="温泉">すべて</button>
+          <button class="chip" data-keyword="日帰り温泉">日帰り温泉</button>
+          <button class="chip" data-keyword="スーパー銭湯">スーパー銭湯</button>
+          <button class="chip" data-keyword="足湯">足湯</button>
+          <button class="chip" data-keyword="公衆浴場 銭湯">共同浴場・銭湯</button>
         </div>
       </div>
       <ul class="results-list" id="resultsList">
@@ -176,27 +176,27 @@
 
   <script>
     let map;
+    let service;
+    let geocoder;
     let infoWindow;
     let markers = [];
-    let currentQuery = '温泉 銭湯 立ち寄り湯';
+    let currentKeyword = '温泉';
     let searchTimeout = null;
-    let geocoder;
 
     const DEFAULT_LOCATION = { lat: 35.681236, lng: 139.767125 };
 
-    async function initMap() {
-      const { Map, InfoWindow } = await google.maps.importLibrary("maps");
-
-      map = new Map(document.getElementById('map'), {
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
         center: DEFAULT_LOCATION,
-        zoom: 14,
+        zoom: 13,
         mapTypeControl: false,
         fullscreenControl: true,
         streetViewControl: false
       });
 
-      infoWindow = new InfoWindow();
+      infoWindow = new google.maps.InfoWindow();
       geocoder = new google.maps.Geocoder();
+      service = new google.maps.places.PlacesService(map);
 
       map.addListener('idle', () => {
         clearTimeout(searchTimeout);
@@ -219,7 +219,7 @@
                 lng: pos.coords.longitude
               };
               map.setCenter(userLocation);
-              map.setZoom(14);
+              map.setZoom(13);
             },
             () => alert('現在地の取得に失敗しました。位置情報の利用を許可してください。')
           );
@@ -235,7 +235,7 @@
         geocoder.geocode({ address: areaName }, (results, status) => {
           if (status === 'OK' && results[0]) {
             map.setCenter(results[0].geometry.location);
-            map.setZoom(14);
+            map.setZoom(13);
           } else {
             alert('場所が見つかりませんでした: ' + status);
           }
@@ -252,57 +252,42 @@
         button.addEventListener('click', (e) => {
           document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
           e.target.classList.add('active');
-          currentQuery = e.target.getAttribute('data-query');
+          currentKeyword = e.target.getAttribute('data-keyword');
           searchBathSpots();
         });
       });
     }
 
-    // 周辺検索処理（表示画面範囲を基準にして厳密に制限）
-    async function searchBathSpots() {
+    // 周辺検索処理（中心から半径5km以内を物理的に限定して検索）
+    function searchBathSpots() {
       clearMarkers();
       const resultsList = document.getElementById('resultsList');
-      resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺の温浴施設を検索中...</li>';
+      resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺の温泉・温浴施設を検索中...</li>';
 
-      try {
-        const { Place } = await google.maps.importLibrary("places");
+      const request = {
+        location: map.getCenter(),
+        radius: 5000, // 中心から半径5km以内を厳格に指定（遠方飛び火を防止）
+        keyword: currentKeyword
+      };
 
-        // 表示中の画面の四隅の範囲（bounds）を取得
-        const bounds = map.getBounds();
-
-        const request = {
-          textQuery: currentQuery,
-          fields: ['displayName', 'location', 'formattedAddress'],
-          // locationBias ではなく locationRestriction を使うことで、画面外（遠方）への飛び火を防止
-          locationRestriction: bounds || {
-            center: map.getCenter(),
-            radius: 4000
-          },
-          maxResultCount: 20
-        };
-
-        const { places } = await Place.searchByText(request);
-
+      service.nearbySearch(request, (results, status) => {
         resultsList.innerHTML = '';
-        if (places && places.length > 0) {
-          places.forEach((place, index) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+          results.forEach((place, index) => {
             createMarker(place);
             appendPlaceToList(place, index);
           });
         } else {
-          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">表示中の地図範囲内に温泉・温浴施設は見つかりませんでした。</li>';
+          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">半径5km以内に該当する温泉・温浴施設は見つかりませんでした。</li>';
         }
-      } catch (err) {
-        console.error(err);
-        resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中にエラーが発生しました。</li>';
-      }
+      });
     }
 
     function createMarker(place) {
       const marker = new google.maps.Marker({
         map: map,
-        position: place.location,
-        title: place.displayName
+        position: place.geometry.location,
+        title: place.name
       });
 
       marker.addListener('click', () => {
@@ -313,8 +298,8 @@
     }
 
     function showInfoWindow(marker, place) {
-      const name = place.displayName || '';
-      const address = place.formattedAddress || '';
+      const name = place.name || '';
+      const address = place.vicinity || '';
       const content = `
         <div style="padding: 6px; font-size: 13px; max-width: 240px;">
           <strong style="color: #1a446c;">♨️ ${name}</strong><br>
@@ -331,12 +316,12 @@
       li.className = 'place-item';
 
       li.innerHTML = `
-        <div class="place-title">♨️ ${place.displayName}</div>
-        <div class="place-vicinity">${place.formattedAddress || '住所情報なし'}</div>
+        <div class="place-title">♨️ ${place.name}</div>
+        <div class="place-vicinity">${place.vicinity || '住所情報なし'}</div>
       `;
 
       li.addEventListener('click', () => {
-        map.panTo(place.location);
+        map.panTo(place.geometry.location);
         if (markers[index]) {
           showInfoWindow(markers[index], place);
         }
@@ -353,7 +338,7 @@
 
   <!-- Google Maps API 読み込み -->
   <script 
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&v=weekly&libraries=places&callback=initMap" 
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&libraries=places&callback=initMap" 
     async defer>
   </script>
 </body>
