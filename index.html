@@ -190,14 +190,18 @@
   const resultCount = document.getElementById("resultCount");
   const totalCount = document.getElementById("totalCount");
 
-  // 都道府県データファイルの読み込み
+  // 都道府県データファイルの読み込み（パスの解決とキャッシュ対策）
   function loadPrefData(prefKey) {
     storeList.innerHTML = `<li class="loading">店舗データを読み込んでいます...</li>`;
     resultCount.textContent = "読み込み中...";
 
-    fetch(`${prefKey}.json`)
+    const url = `./${prefKey}.json?v=${new Date().getTime()}`;
+
+    fetch(url)
       .then(res => {
-        if (!res.ok) throw new Error("データの取得に失敗しました");
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
         return res.json();
       })
       .then(data => {
@@ -206,12 +210,12 @@
         filterStores();
       })
       .catch(err => {
-        storeList.innerHTML = `<li class="loading" style="color:red;">データの読み込みに失敗しました。</li>`;
+        console.error(err);
+        storeList.innerHTML = `<li class="loading" style="color:red;">データの読み込みに失敗しました (${err.message})</li>`;
         resultCount.textContent = "エラー";
       });
   }
 
-  // チェーン選択切り替え
   chainButtons.addEventListener("click", (e) => {
     if (e.target.classList.contains("chain-btn")) {
       document.querySelectorAll(".chain-btn").forEach(btn => btn.classList.remove("active"));
