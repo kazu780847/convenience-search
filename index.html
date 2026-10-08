@@ -160,7 +160,7 @@
 
     <div class="form-group" style="margin-bottom: 0;">
       <label for="keywordInput">3. 市区町村・店舗名で絞り込み</label>
-      <input type="text" id="keywordInput" placeholder="例：蓮田、大宮、駅前、川越...">
+      <input type="text" id="keywordInput" placeholder="例：蓮田、見沼町、大宮、駅前...">
     </div>
   </div>
 
@@ -172,54 +172,12 @@
   <ul class="store-list" id="storeList"></ul>
 </div>
 
-<script>
-  // 埼玉県内主要店舗データ（内蔵型）
-  const saitamaStores = [
-    { name: "セブン-イレブン 蓮田駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市本町1-2" },
-    { name: "ファミリーマート 蓮田駅西口店", chain: "ファミリーマート", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市本町3-5" },
-    { name: "ローソン 蓮田見沼町店", chain: "ローソン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市見沼町15-3" },
-    { name: "セブン-イレブン 蓮田末広2丁目店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市末広2-3-12" },
-    { name: "ファミリーマート 蓮田黒浜店", chain: "ファミリーマート", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字黒浜2810" },
-    { name: "セブン-イレブン 蓮田閏戸店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字閏戸1821-1" },
-    { name: "ミニストップ 蓮田根金店", chain: "ミニストップ", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字根金889-1" },
-    { name: "セブン-イレブン 白岡駅西口店", chain: "セブン-イレブン", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市小久喜1205-1" },
-    { name: "ファミリーマート 白岡駅東口店", chain: "ファミリーマート", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市小久喜1082" },
-    { name: "ローソン 白岡篠津店", chain: "ローソン", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市篠津772-1" },
-    { name: "セブン-イレブン 大宮駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区大門町1-21" },
-    { name: "ファミリーマート 大宮駅北店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区錦町630" },
-    { name: "ローソン 大宮駅西口店", chain: "ローソン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区桜木町1-8-1" },
-    { name: "セブン-イレブン 大宮桜木町2丁目店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区桜木町2-159" },
-    { name: "ファミリーマート 大宮仲町店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区仲町2-25" },
-    { name: "セブン-イレブン さいたま新都心駅前店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区吉敷町4-262-1" },
-    { name: "ローソン さいたま新都心けやきひろば店", chain: "ローソン", pref: "埼玉県", city: "さいたま市中央区", address: "埼玉県さいたま市中央区新都心10" },
-    { name: "セブン-イレブン 浦和駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市浦和区", address: "埼玉県さいたま市浦和区東高砂町2-5" },
-    { name: "ファミリーマート 浦和仲町店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市浦和区", address: "埼玉県さいたま市浦和区仲町1-10-1" },
-    { name: "ローソン 浦和駅西口店", chain: "ローソン", pref: "埼玉県", city: "さいたま市浦和区", address: "埼玉県さいたま市浦和区高砂1-12-1" },
-    { name: "セブン-イレブン 上尾駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "上尾市", address: "埼玉県上尾市仲町1-7-25" },
-    { name: "ファミリーマート 上尾駅西口店", chain: "ファミリーマート", pref: "埼玉県", city: "上尾市", address: "埼玉県上尾市谷津2-1-50" },
-    { name: "ローソン 上尾宮本町店", "chain": "ローソン", pref: "埼玉県", city: "上尾市", address: "埼玉県上尾市宮本町9-8" },
-    { name: "セブン-イレブン 久喜駅西口店", chain: "セブン-イレブン", pref: "埼玉県", city: "久喜市", address: "埼玉県久喜市久喜中央1-1-1" },
-    { name: "ファミリーマート 久喜東口店", chain: "ファミリーマート", pref: "埼玉県", city: "久喜市", address: "埼玉県久喜市久喜東2-1-5" },
-    { name: "ローソン 久喜青毛店", chain: "ローソン", pref: "埼玉県", city: "久喜市", address: "埼玉県久喜市青毛1-7-1" },
-    { name: "セブン-イレブン 川越駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "川越市", address: "埼玉県川越市脇田町105" },
-    { name: "ファミリーマート 川越駅西口店", chain: "ファミリーマート", pref: "埼玉県", city: "川越市", address: "埼玉県川越市脇田本町1-5" },
-    { name: "ローソン 川越クレアモール店", chain: "ローソン", pref: "埼玉県", city: "川越市", address: "埼玉県川越市新富町2-1-4" },
-    { name: "ミニストップ 川越神明町店", chain: "ミニストップ", pref: "埼玉県", city: "川越市", address: "埼玉県川越市神明町13-1" },
-    { name: "セブン-イレブン 春日部駅西口店", chain: "セブン-イレブン", pref: "埼玉県", city: "春日部市", address: "埼玉県春日部市中央1-1-7" },
-    { name: "ファミリーマート 春日部駅東口店", chain: "ファミリーマート", pref: "埼玉県", city: "春日部市", address: "埼玉県春日部市粕壁1-7-1" },
-    { name: "ローソン 春日部中央一丁目店", chain: "ローソン", pref: "埼玉県", city: "春日部市", address: "埼玉県春日部市中央1-8-6" },
-    { name: "セブン-イレブン 越谷駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "越谷市", address: "埼玉県越谷市弥生町1-4" },
-    { name: "ファミリーマート 越谷駅前店", chain: "ファミリーマート", pref: "埼玉県", city: "越谷市", address: "埼玉県越谷市弥生町3-33" },
-    { name: "ローソン 越谷赤山町一丁目店", chain: "ローソン", pref: "埼玉県", city: "越谷市", address: "埼玉県越谷市赤山町1-88-1" },
-    { name: "セブン-イレブン 草加駅西口店", chain: "セブン-イレブン", pref: "埼玉県", city: "草加市", address: "埼玉県草加市氷川町2126-5" },
-    { name: "ファミリーマート 草加駅東口店", chain: "ファミリーマート", pref: "埼玉県", city: "草加市", address: "埼玉県草加市高砂2-6-1" },
-    { name: "ローソン 草加住吉一丁目店", chain: "ローソン", pref: "埼玉県", city: "草加市", address: "埼玉県草加市住吉1-11-20" },
-    { name: "セブン-イレブン 熊谷駅南口店", chain: "セブン-イレブン", pref: "埼玉県", city: "熊谷市", address: "埼玉県熊谷市桜木町1-1-1" },
-    { name: "ファミリーマート 熊谷駅北口店", chain: "ファミリーマート", pref: "埼玉県", city: "熊谷市", address: "埼玉県熊谷市筑波2-102" },
-    { name: "ローソン 熊谷筑波二丁目店", chain: "ローソン", pref: "埼玉県", city: "熊谷市", address: "埼玉県熊谷市筑波2-61" }
-  ];
+<!-- 外部JSファイルとして安全・高速に店舗データを読み込み -->
+<script src="saitama.js"></script>
 
-  let currentStores = saitamaStores;
+<script>
+  // saitama.js からデータを取得
+  let currentStores = window.SAITAMA_STORES || [];
   let selectedChain = "";
 
   const keywordInput = document.getElementById("keywordInput");
