@@ -196,8 +196,12 @@
       infoWindow = new InfoWindow();
       geocoder = new google.maps.Geocoder();
 
+      // 初回表示完了時に検索を実行
+      google.maps.event.addListenerOnce(map, 'idle', () => {
+        searchBathSpots();
+      });
+
       setupEventListeners();
-      searchBathSpots();
     }
 
     function setupEventListeners() {
@@ -213,7 +217,7 @@
               };
               map.setCenter(currentCenter);
               map.setZoom(13);
-              searchBathSpots();
+              setTimeout(searchBathSpots, 300);
             },
             () => alert('現在地の取得に失敗しました。位置情報の利用を許可してください。')
           );
@@ -232,7 +236,7 @@
             currentCenter = results[0].geometry.location;
             map.setCenter(currentCenter);
             map.setZoom(13);
-            searchBathSpots();
+            setTimeout(searchBathSpots, 300);
           } else {
             alert('場所が見つかりませんでした: ' + status);
           }
@@ -256,8 +260,8 @@
       });
     }
 
-    // 2点間の直線距離（km）を計算
-    function getDistanceKm(lat1, lng1, lat2, lng2) {
+    // 2点間の直線距離（km）計算関数
+    function calcDistanceKm(lat1, lng1, lat2, lng2) {
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLng = (lng2 - lng1) * Math.PI / 180;
@@ -279,7 +283,6 @@
       try {
         const { Place } = await google.maps.importLibrary("places");
 
-        // 検索枠に地名がある場合はキーワードに結合して確実にその周辺を引き当てる
         let fullQuery = currentQuery;
         if (searchInput) {
           fullQuery = searchInput + ' ' + currentQuery;
@@ -289,8 +292,8 @@
           textQuery: fullQuery,
           fields: ['displayName', 'location', 'formattedAddress'],
           locationBias: {
-            center: currentCenter,
-            radius: 5000
+            center: map.getCenter(),
+            radius: 6000
           },
           maxResultCount: 20
         };
@@ -299,17 +302,17 @@
 
         resultsList.innerHTML = '';
         if (places && places.length > 0) {
-          // 基準地点の緯度経度
-          const baseLat = typeof currentCenter.lat === 'function' ? currentCenter.lat() : currentCenter.lat;
-          const baseLng = typeof currentCenter.lng === 'function' ? currentCenter.lng() : currentCenter.lng;
+          // 基準地点の座標（関数型・数値型の両方に対応）
+          const c = map.getCenter();
+          const baseLat = typeof c.lat === 'function' ? c.lat() : c.lat;
+          const baseLng = typeof c.lng === 'function' ? c.lng() : c.lng;
 
-          // 基準地点から8km以内の施設だけに厳格フィルタリング（弘前などの遠方を足切り）
+          // 中心から8km以内にある施設のみを抽出（弘前や平川などの遠方を排除）
           const filteredPlaces = places.filter(place => {
             if (!place.location) return false;
-            const pLat = place.location.lat();
-            const pLng = place.location.lng();
-            const dist = getDistanceKm(baseLat, baseLng, pLat, pLng);
-            return dist <= 8.0; // 8km以内
+            const pLat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat;
+            const pLng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng;
+            return calcDistanceKm(baseLat, baseLng, pLat, pLng) <= 8.5;
           });
 
           if (filteredPlaces.length > 0) {
@@ -318,7 +321,7 @@
               appendPlaceToList(place, index);
             });
           } else {
-            resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">指定地点の近郊（8km圏内）に該当する温泉は見つかりませんでした。</li>';
+            resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">指定地点から8km圏内に温泉は見つかりませんでした。</li>';
           }
         } else {
           resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺に温泉は見つかりませんでした。</li>';
