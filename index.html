@@ -3,314 +3,377 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>都道府県別 コンビニ店舗検索</title>
+  <title>全国コンビニ検索アプリ</title>
   <style>
-    :root {
-      --primary: #1976d2;
-      --bg: #f5f7fa;
-      --card-bg: #ffffff;
-      --border: #e0e0e0;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-      margin: 0;
-      padding: 16px;
-      background-color: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
       color: #333;
     }
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 1.4rem;
-      text-align: center;
-      margin-bottom: 20px;
-      color: #1a237e;
-    }
-    .search-card {
-      background: var(--card-bg);
-      padding: 16px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-      margin-bottom: 16px;
-    }
-    .form-group {
-      margin-bottom: 14px;
-    }
-    label {
-      display: block;
+    header {
+      background-color: #007bff;
+      color: #fff;
+      padding: 12px 20px;
+      font-size: 1.2rem;
       font-weight: bold;
-      font-size: 0.9rem;
-      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      z-index: 10;
     }
-    select, input[type="text"] {
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    /* サイドバー（検索・一覧） */
+    .sidebar {
+      width: 380px;
+      display: flex;
+      flex-direction: column;
+      background: #fdfdfd;
+      border-right: 1px solid #ddd;
+      z-index: 5;
+    }
+    .search-panel {
+      padding: 16px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button {
+      padding: 8px 12px;
+      background: #007bff;
+      border: none;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .btn-current {
+      background: #28a745;
       width: 100%;
-      padding: 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      box-sizing: border-box;
-      font-size: 1rem;
+      margin-bottom: 10px;
     }
-    .chain-buttons {
+    .btn-current:hover {
+      background: #218838;
+    }
+    /* チェーン別フィルタボタン */
+    .filter-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
     }
-    .chain-btn {
-      padding: 8px 14px;
-      border: 1px solid var(--border);
-      border-radius: 20px;
+    .chip {
+      padding: 4px 10px;
+      border-radius: 16px;
+      border: 1px solid #ccc;
       background: #fff;
+      font-size: 12px;
       cursor: pointer;
-      font-size: 0.9rem;
-      transition: all 0.2s;
+      color: #555;
     }
-    .chain-btn.active {
-      background: var(--primary);
+    .chip.active {
+      background: #007bff;
       color: #fff;
-      border-color: var(--primary);
+      border-color: #007bff;
     }
-    .result-info {
-      font-size: 0.9rem;
-      color: #666;
-      margin: 12px 4px;
-      display: flex;
-      justify-content: space-between;
-    }
-    .store-list {
+    /* 店舗一覧リスト */
+    .results-list {
+      flex: 1;
+      overflow-y: auto;
       list-style: none;
-      padding: 0;
-      margin: 0;
     }
-    .store-item {
-      background: var(--card-bg);
-      border-radius: 10px;
+    .place-item {
       padding: 14px 16px;
-      margin-bottom: 10px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background 0.15s;
     }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
+    .place-item:hover {
+      background: #f0f7ff;
+    }
+    .place-title {
+      font-size: 15px;
       font-weight: bold;
-      color: #fff;
+      color: #1a73e8;
       margin-bottom: 4px;
     }
-    .badge-seven { background-color: #008054; }
-    .badge-lawson { background-color: #0068b7; }
-    .badge-famima { background-color: #009944; }
-    .badge-ministop { background-color: #003e8a; }
-    .badge-other { background-color: #757575; }
-    .store-name {
-      font-size: 1rem;
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
-    .store-address {
-      font-size: 0.85rem;
+    .place-vicinity {
+      font-size: 13px;
       color: #666;
+      margin-bottom: 4px;
     }
-    .map-link {
-      background: #e3f2fd;
-      color: #1565c0;
-      text-decoration: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      font-weight: bold;
-      white-space: nowrap;
-      margin-left: 12px;
+    .place-status {
+      font-size: 12px;
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
     }
-    .map-link:hover {
-      background: #bbdefb;
+    .status-open {
+      background: #e6f4ea;
+      color: #137333;
+    }
+    .status-closed {
+      background: #fce8e6;
+      color: #c5221f;
+    }
+    /* 地図エリア */
+    #map {
+      flex: 1;
+      height: 100%;
+    }
+    /* レスポンシブ対応 (画面幅が狭い場合) */
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column-reverse;
+      }
+      .sidebar {
+        width: 100%;
+        height: 45vh;
+      }
+      #map {
+        height: 55vh;
+      }
     }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>全国コンビニ店舗ナビ</h1>
+  <header>
+    <span>全国コンビニ動的マップ検索</span>
+  </header>
 
-  <div class="search-card">
-    <div class="form-group">
-      <label for="prefSelect">1. 都道府県を選択</label>
-      <select id="prefSelect">
-        <option value="saitama">埼玉県</option>
-        <option value="tokyo" disabled>東京都 (順次追加)</option>
-        <option value="kanagawa" disabled>神奈川県 (順次追加)</option>
-      </select>
-    </div>
-
-    <div class="form-group">
-      <label>2. チェーンを選択</label>
-      <div class="chain-buttons" id="chainButtons">
-        <button class="chain-btn active" data-chain="">すべて</button>
-        <button class="chain-btn" data-chain="セブン-イレブン">セブン-イレブン</button>
-        <button class="chain-btn" data-chain="ファミリーマート">ファミリーマート</button>
-        <button class="chain-btn" data-chain="ローソン">ローソン</button>
-        <button class="chain-btn" data-chain="ミニストップ">ミニストップ</button>
+  <div class="container">
+    <!-- サイドバー -->
+    <div class="sidebar">
+      <div class="search-panel">
+        <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺を検索</button>
+        <div class="input-group">
+          <input type="text" id="targetArea" placeholder="地名・市区町村名 (例: 渋谷駅, 梅田)">
+          <button id="btnAreaSearch">移動</button>
+        </div>
+        <div class="filter-chips">
+          <button class="chip active" data-chain="コンビニ">すべて</button>
+          <button class="chip" data-chain="セブン-イレブン">セブン</button>
+          <button class="chip" data-chain="ファミリーマート">ファミマ</button>
+          <button class="chip" data-chain="ローソン">ローソン</button>
+          <button class="chip" data-chain="ミニストップ">ミニストップ</button>
+        </div>
       </div>
+      <ul class="results-list" id="resultsList">
+        <li style="padding: 20px; text-align: center; color: #888;">
+          地図を動かすか、エリアを指定して検索してください。
+        </li>
+      </ul>
     </div>
 
-    <div class="form-group" style="margin-bottom: 0;">
-      <label for="keywordInput">3. 市区町村・店舗名で絞り込み</label>
-      <input type="text" id="keywordInput" placeholder="例：蓮田、見沼町、大宮、駅前...">
-    </div>
+    <!-- 地図コンテナ -->
+    <div id="map"></div>
   </div>
 
-  <div class="result-info">
-    <span id="resultCount">検索結果：0件</span>
-    <span id="totalCount"></span>
-  </div>
+  <script>
+    let map;
+    let service;
+    let infoWindow;
+    let markers = [];
+    let currentKeyword = 'コンビニ';
+    let searchTimeout = null;
 
-  <ul class="store-list" id="storeList"></ul>
-</div>
+    // 初期位置 (東京駅周辺)
+    const DEFAULT_LOCATION = { lat: 35.681236, lng: 139.767125 };
 
-<script>
-  // 店舗データをHTML内に直接組み込み（通信エラー・遅延ゼロ）
-  const currentStores = [
-    // === 蓮田市（全店舗網羅） ===
-    { name: "ローソン 蓮田見沼町店", chain: "ローソン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市見沼町15-3" },
-    { name: "ローソン 蓮田馬込一丁目店", chain: "ローソン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市馬込1-311" },
-    { name: "ローソン 蓮田三丁目店", chain: "ローソン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市蓮田3-79" },
-    { name: "ローソン 蓮田閏戸店", chain: "ローソン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字閏戸2821" },
-    { name: "ローソン 蓮田貝塚店", chain: "ローソン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字貝塚1037-2" },
-    { name: "ローソン Pasar蓮田店", chain: "ローソン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字川島370" },
-    { name: "セブン-イレブン 蓮田駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市本町1-2" },
-    { name: "セブン-イレブン 蓮田駅西口店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市本町3-1" },
-    { name: "セブン-イレブン 蓮田末広2丁目店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市末広2-3-12" },
-    { name: "セブン-イレブン 蓮田閏戸店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字閏戸1821-1" },
-    { name: "セブン-イレブン 蓮田黒浜南店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字黒浜3498-1" },
-    { name: "セブン-イレブン 蓮田山ノ内店", chain: "セブン-イレブン", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字蓮田252-1" },
-    { name: "ファミリーマート 蓮田駅西口店", chain: "ファミリーマート", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市本町3-5" },
-    { name: "ファミリーマート 蓮田黒浜店", chain: "ファミリーマート", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字黒浜2810" },
-    { name: "ファミリーマート 蓮田椿山店", chain: "ファミリーマート", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市椿山2-1-2" },
-    { name: "ファミリーマート 蓮田西新宿店", chain: "ファミリーマート", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市西新宿1-38" },
-    { name: "ミニストップ 蓮田根金店", chain: "ミニストップ", pref: "埼玉県", city: "蓮田市", address: "埼玉県蓮田市大字根金889-1" },
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: DEFAULT_LOCATION,
+        zoom: 15,
+        mapTypeControl: false,
+        fullscreenControl: true,
+        streetViewControl: false
+      });
 
-    // === 白岡市 ===
-    { name: "セブン-イレブン 白岡駅西口店", chain: "セブン-イレブン", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市小久喜1205-1" },
-    { name: "セブン-イレブン 白岡千駄野店", chain: "セブン-イレブン", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市千駄野1052-1" },
-    { name: "ファミリーマート 白岡駅東口店", chain: "ファミリーマート", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市小久喜1082" },
-    { name: "ファミリーマート 白岡西店", chain: "ファミリーマート", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市西8-4-1" },
-    { name: "ローソン 白岡篠津店", chain: "ローソン", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市篠津772-1" },
-    { name: "ローソン 白岡新白岡三丁目店", chain: "ローソン", pref: "埼玉県", city: "白岡市", address: "埼玉県白岡市新白岡3-46-1" },
+      infoWindow = new google.maps.InfoWindow();
+      service = new google.maps.places.PlacesService(map);
 
-    // === さいたま市大宮区 ===
-    { name: "セブン-イレブン 大宮駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区大門町1-21" },
-    { name: "セブン-イレブン 大宮桜木町2丁目店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区桜木町2-159" },
-    { name: "セブン-イレブン さいたま新都心駅前店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区吉敷町4-262-1" },
-    { name: "ファミリーマート 大宮駅北店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区錦町630" },
-    { name: "ファミリーマート 大宮仲町店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区仲町2-25" },
-    { name: "ローソン 大宮駅西口店", chain: "ローソン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区桜木町1-8-1" },
-    { name: "ローソン 大宮南銀座通り店", chain: "ローソン", pref: "埼玉県", city: "さいたま市大宮区", address: "埼玉県さいたま市大宮区仲町1-54-3" },
+      // 地図のドラッグ・ズーム停止時に動的再検索 (負荷軽減のためデバウンス処理)
+      map.addListener('idle', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          searchConvenienceStores();
+        }, 500);
+      });
 
-    // === さいたま市見沼区 ===
-    { name: "セブン-イレブン さいたま東大宮5丁目店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市見沼区", address: "埼玉県さいたま市見沼区東大宮5-36-8" },
-    { name: "ファミリーマート 東大宮駅東口店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市見沼区", address: "埼玉県さいたま市見沼区東大宮5-2-13" },
-    { name: "ローソン 東大宮駅西口店", chain: "ローソン", pref: "埼玉県", city: "さいたま市見沼区", address: "埼玉県さいたま市見沼区東大宮4-18-1" },
-    { name: "ファミリーマート さいたま深作一丁目店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市見沼区", address: "埼玉県さいたま市見沼区深作1-28-1" },
-
-    // === さいたま市浦和区・中央区 ===
-    { name: "セブン-イレブン 浦和駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "さいたま市浦和区", address: "埼玉県さいたま市浦和区東高砂町2-5" },
-    { name: "ファミリーマート 浦和仲町店", chain: "ファミリーマート", pref: "埼玉県", city: "さいたま市浦和区", address: "埼玉県さいたま市浦和区仲町1-10-1" },
-    { name: "ローソン 浦和駅西口店", chain: "ローソン", pref: "埼玉県", city: "さいたま市浦和区", address: "埼玉県さいたま市浦和区高砂1-12-1" },
-    { name: "ローソン さいたま新都心けやきひろば店", chain: "ローソン", pref: "埼玉県", city: "さいたま市中央区", address: "埼玉県さいたま市中央区新都心10" },
-
-    // === 上尾市・久喜市・川越市・熊谷市 ===
-    { name: "セブン-イレブン 上尾駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "上尾市", address: "埼玉県上尾市仲町1-7-25" },
-    { name: "ファミリーマート 上尾駅西口店", chain: "ファミリーマート", pref: "埼玉県", city: "上尾市", address: "埼玉県上尾市谷津2-1-50" },
-    { name: "ローソン 上尾宮本町店", chain: "ローソン", pref: "埼玉県", city: "上尾市", address: "埼玉県上尾市宮本町9-8" },
-    { name: "セブン-イレブン 久喜駅西口店", chain: "セブン-イレブン", pref: "埼玉県", city: "久喜市", address: "埼玉県久喜市久喜中央1-1-1" },
-    { name: "ファミリーマート 久喜東口店", chain: "ファミリーマート", pref: "埼玉県", city: "久喜市", address: "埼玉県久喜市久喜東2-1-5" },
-    { name: "ローソン 久喜青毛店", chain: "ローソン", pref: "埼玉県", city: "久喜市", address: "埼玉県久喜市青毛1-7-1" },
-    { name: "セブン-イレブン 川越駅東口店", chain: "セブン-イレブン", pref: "埼玉県", city: "川越市", address: "埼玉県川越市脇田町105" },
-    { name: "ファミリーマート 川越駅西口店", chain: "ファミリーマート", pref: "埼玉県", city: "川越市", address: "埼玉県川越市脇田本町1-5" },
-    { name: "ローソン 川越クレアモール店", chain: "ローソン", pref: "埼玉県", city: "川越市", address: "埼玉県川越市新富町2-1-4" },
-    { name: "ミニストップ 川越神明町店", chain: "ミニストップ", pref: "埼玉県", city: "川越市", address: "埼玉県川越市神明町13-1" },
-    { name: "セブン-イレブン 熊谷駅南口店", chain: "セブン-イレブン", pref: "埼玉県", city: "熊谷市", address: "埼玉県熊谷市桜木町1-1-1" },
-    { name: "ファミリーマート 熊谷駅北口店", chain: "ファミリーマート", pref: "埼玉県", city: "熊谷市", address: "埼玉県熊谷市筑波2-102" },
-    { name: "ローソン 熊谷筑波二丁目店", chain: "ローソン", pref: "埼玉県", city: "熊谷市", address: "埼玉県熊谷市筑波2-61" }
-  ];
-
-  let selectedChain = "";
-
-  const keywordInput = document.getElementById("keywordInput");
-  const chainButtons = document.getElementById("chainButtons");
-  const storeList = document.getElementById("storeList");
-  const resultCount = document.getElementById("resultCount");
-  const totalCount = document.getElementById("totalCount");
-
-  chainButtons.addEventListener("click", (e) => {
-    if (e.target.classList.contains("chain-btn")) {
-      document.querySelectorAll(".chain-btn").forEach(btn => btn.classList.remove("active"));
-      e.target.classList.add("active");
-      selectedChain = e.target.dataset.chain;
-      filterStores();
-    }
-  });
-
-  keywordInput.addEventListener("input", filterStores);
-
-  function getBadgeClass(chain) {
-    if (chain.includes("セブン")) return "badge-seven";
-    if (chain.includes("ローソン")) return "badge-lawson";
-    if (chain.includes("ファミリーマート")) return "badge-famima";
-    if (chain.includes("ミニストップ")) return "badge-ministop";
-    return "badge-other";
-  }
-
-  function filterStores() {
-    const keyword = keywordInput.value.trim().toLowerCase();
-
-    const filtered = currentStores.filter(store => {
-      const matchChain = !selectedChain || store.chain === selectedChain;
-      const matchKeyword = !keyword || 
-        store.name.toLowerCase().includes(keyword) || 
-        (store.city && store.city.toLowerCase().includes(keyword)) ||
-        store.address.toLowerCase().includes(keyword);
-
-      return matchChain && matchKeyword;
-    });
-
-    resultCount.textContent = `検索結果：${filtered.length}件`;
-    renderList(filtered);
-  }
-
-  function renderList(stores) {
-    storeList.innerHTML = "";
-    if (stores.length === 0) {
-      storeList.innerHTML = `<li style="text-align:center; padding: 20px; color:#888;">該当する店舗が見つかりませんでした。</li>`;
-      return;
+      setupEventListeners();
     }
 
-    stores.forEach(store => {
-      const li = document.createElement("li");
-      li.className = "store-item";
-      
-      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.name + " " + store.address)}`;
+    // イベントリスナーの登録
+    function setupEventListeners() {
+      // 現在地取得
+      document.getElementById('btnCurrentLocation').addEventListener('click', () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const userLocation = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude
+              };
+              map.setCenter(userLocation);
+              map.setZoom(16);
+            },
+            () => alert('現在地の取得に失敗しました。位置情報の利用を許可してください。')
+          );
+        } else {
+          alert('お使いのブラウザは位置情報取得に対応していません。');
+        }
+      });
+
+      // エリア名・地名での移動検索 (Geocoding API不要のTextSearchを使用)
+      document.getElementById('btnAreaSearch').addEventListener('click', () => {
+        const areaName = document.getElementById('targetArea').value.trim();
+        if (!areaName) return;
+
+        const request = { query: areaName, fields: ['geometry'] };
+        service.findPlaceFromQuery(request, (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
+            map.setCenter(results[0].geometry.location);
+            map.setZoom(15);
+          } else {
+            alert('指定の場所が見つかりませんでした。');
+          }
+        });
+      });
+
+      // チェーン別フィルター
+      document.querySelectorAll('.chip').forEach(button => {
+        button.addEventListener('click', (e) => {
+          document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          currentKeyword = e.target.getAttribute('data-chain');
+          searchConvenienceStores();
+        });
+      });
+    }
+
+    // 周辺のコンビニを動的検索
+    function searchConvenienceStores() {
+      clearMarkers();
+      const resultsList = document.getElementById('resultsList');
+      resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中...</li>';
+
+      const request = {
+        location: map.getCenter(),
+        radius: 1200, // 検索半径 (メートル単位)
+        type: ['convenience_store'],
+        keyword: currentKeyword
+      };
+
+      service.nearbySearch(request, (results, status) => {
+        resultsList.innerHTML = '';
+        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+          results.forEach((place, index) => {
+            createMarker(place);
+            appendPlaceToList(place, index);
+          });
+        } else {
+          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">この周辺に該当するコンビニは見つかりませんでした。</li>';
+        }
+      });
+    }
+
+    // 地図上にマーカーを生成
+    function createMarker(place) {
+      const marker = new google.maps.Marker({
+        map: map,
+        position: place.geometry.location,
+        title: place.name
+      });
+
+      marker.addListener('click', () => {
+        showInfoWindow(marker, place);
+      });
+
+      markers.push(marker);
+    }
+
+    // 店舗情報ウィンドウを表示
+    function showInfoWindow(marker, place) {
+      const isOpen = place.opening_hours ? (place.opening_hours.open_now ? '<span style="color:green;">営業中</span>' : '<span style="color:red;">休業中</span>') : '営業時間情報なし';
+      const content = `
+        <div style="padding: 4px; font-size: 13px; max-width: 200px;">
+          <strong>${place.name}</strong><br>
+          <span style="color:#555;">${place.vicinity || ''}</span><br>
+          ${isOpen}
+        </div>
+      `;
+      infoWindow.setContent(content);
+      infoWindow.open(map, marker);
+    }
+
+    // 一覧リストに追加
+    function appendPlaceToList(place, index) {
+      const list = document.getElementById('resultsList');
+      const li = document.createElement('li');
+      li.className = 'place-item';
+
+      let openStatusHtml = '';
+      if (place.opening_hours) {
+        openStatusHtml = place.opening_hours.open_now 
+          ? '<span class="place-status status-open">営業中</span>' 
+          : '<span class="place-status status-closed">休業中</span>';
+      }
 
       li.innerHTML = `
-        <div>
-          <span class="badge ${getBadgeClass(store.chain)}">${store.chain}</span>
-          <div class="store-name">${store.name}</div>
-          <div class="store-address">${store.address}</div>
-        </div>
-        <a href="${mapUrl}" target="_blank" rel="noopener" class="map-link">地図</a>
+        <div class="place-title">${place.name}</div>
+        <div class="place-vicinity">${place.vicinity || '住所情報なし'}</div>
+        ${openStatusHtml}
       `;
-      storeList.appendChild(li);
-    });
-  }
 
-  totalCount.textContent = `(総店舗数: ${currentStores.length}件)`;
-  filterStores();
-</script>
+      // リスト項目クリックで該当マーカーへフォーカス
+      li.addEventListener('click', () => {
+        map.panTo(place.geometry.location);
+        if (markers[index]) {
+          showInfoWindow(markers[index], place);
+        }
+      });
 
+      list.appendChild(li);
+    }
+
+    // 既存マーカーのクリア
+    function clearMarkers() {
+      markers.forEach(m => m.setMap(null));
+      markers = [];
+    }
+  </script>
+
+  <!-- Google Maps JavaScript APIの読み込み (Placesライブラリを指定) -->
+  <!-- ※ YOUR_API_KEY を取得済みのGoogle Maps APIキーに置き換えてください -->
+  <script 
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" 
+    async defer>
+  </script>
 </body>
 </html>
