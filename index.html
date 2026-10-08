@@ -34,7 +34,6 @@
       flex: 1;
       overflow: hidden;
     }
-    /* サイドバー（検索・一覧） */
     .sidebar {
       width: 380px;
       display: flex;
@@ -81,7 +80,6 @@
     .btn-current:hover {
       background: #218838;
     }
-    /* チェーン別フィルタボタン */
     .filter-chips {
       display: flex;
       flex-wrap: wrap;
@@ -101,7 +99,6 @@
       color: #fff;
       border-color: #007bff;
     }
-    /* 店舗一覧リスト */
     .results-list {
       flex: 1;
       overflow-y: auto;
@@ -141,12 +138,10 @@
       background: #fce8e6;
       color: #c5221f;
     }
-    /* 地図エリア */
     #map {
       flex: 1;
       height: 100%;
     }
-    /* レスポンシブ対応 */
     @media (max-width: 768px) {
       .container {
         flex-direction: column-reverse;
@@ -168,7 +163,6 @@
   </header>
 
   <div class="container">
-    <!-- サイドバー -->
     <div class="sidebar">
       <div class="search-panel">
         <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺を検索</button>
@@ -186,29 +180,29 @@
       </div>
       <ul class="results-list" id="resultsList">
         <li style="padding: 20px; text-align: center; color: #888;">
-          地図を動かすか、エリアを指定して検索してください。
+          検索中...
         </li>
       </ul>
     </div>
 
-    <!-- 地図コンテナ -->
     <div id="map"></div>
   </div>
 
   <script>
     let map;
-    let service;
-    let geocoder;
     let infoWindow;
     let markers = [];
     let currentKeyword = 'コンビニ';
     let searchTimeout = null;
+    let geocoder;
 
-    // 初期位置 (東京駅周辺)
     const DEFAULT_LOCATION = { lat: 35.681236, lng: 139.767125 };
 
-    function initMap() {
-      map = new google.maps.Map(document.getElementById('map'), {
+    async function initMap() {
+      const { Map } = await google.maps.importLibrary("maps");
+      const { InfoWindow } = await google.maps.importLibrary("maps");
+
+      map = new Map(document.getElementById('map'), {
         center: DEFAULT_LOCATION,
         zoom: 15,
         mapTypeControl: false,
@@ -216,22 +210,19 @@
         streetViewControl: false
       });
 
-      infoWindow = new google.maps.InfoWindow();
-      service = new google.maps.places.PlacesService(map);
+      infoWindow = new InfoWindow();
       geocoder = new google.maps.Geocoder();
 
-      // 地図の停止時に自動検索
       map.addListener('idle', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
           searchConvenienceStores();
-        }, 500);
+        }, 600);
       });
 
       setupEventListeners();
     }
 
-    // イベントリスナーの登録
     function setupEventListeners() {
       // 現在地取得
       document.getElementById('btnCurrentLocation').addEventListener('click', () => {
@@ -252,7 +243,7 @@
         }
       });
 
-      // エリア名・地名での移動検索 (Geocoding APIを使用)
+      // エリア検索
       document.getElementById('btnAreaSearch').addEventListener('click', () => {
         const areaName = document.getElementById('targetArea').value.trim();
         if (!areaName) return;
@@ -262,19 +253,18 @@
             map.setCenter(results[0].geometry.location);
             map.setZoom(15);
           } else {
-            alert('場所の検索に失敗しました。 (ステータス: ' + status + ')');
+            alert('場所が見つかりませんでした: ' + status);
           }
         });
       });
 
-      // Enterキーでも検索可能に
       document.getElementById('targetArea').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
           document.getElementById('btnAreaSearch').click();
         }
       });
 
-      // チェーン別フィルター
+      // フィルター切り替え
       document.querySelectorAll('.chip').forEach(button => {
         button.addEventListener('click', (e) => {
           document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
@@ -285,12 +275,46 @@
       });
     }
 
-    // 周辺のコンビニを動的検索
-    function searchConvenienceStores() {
+    // 周辺検索処理 (Places API New / Place クラス対応)
+    async function searchConvenienceStores() {
       clearMarkers();
       const resultsList = document.getElementById('resultsList');
       resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中...</li>';
 
+      try {
+        const { Place } = await google.maps.importLibrary("places");
+        const request = {
+          textQuery: currentKeyword === 'コンビニ' ? 'コンビニエンスストア' : currentKeyword,
+          fields: ['displayName', 'location', 'formattedAddress', 'regularOpeningHours'],
+          locationBias: {
+            center: map.getCenter(),
+            radius: 1200
+          },
+          maxResultCount: 20
+        };
+
+        const { places } = await Place.searchByText(request);
+
+        resultsList.innerHTML = '';
+        if (places && places.length > 0) {
+          places.forEach((place, index) => {
+            createMarker(place);
+            appendPlaceToList(place, index);
+          });
+        } else {
+          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺にコンビニが見つかりませんでした。</li>';
+        }
+      } catch (err) {
+        console.error(err);
+        // フォールバック: 従来型 PlacesService 呼び出し
+        fallbackSearch();
+      }
+    }
+
+    // 互換性フォールバック検索
+    function fallbackSearch() {
+      const resultsList = document.getElementById('resultsList');
+      const service = new google.maps.places.PlacesService(map);
       const request = {
         location: map.getCenter(),
         radius: 1200,
@@ -301,22 +325,26 @@
       service.nearbySearch(request, (results, status) => {
         resultsList.innerHTML = '';
         if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-          results.forEach((place, index) => {
-            createMarker(place);
-            appendPlaceToList(place, index);
+          results.forEach((p, idx) => {
+            const placeObj = {
+              displayName: p.name,
+              location: p.geometry.location,
+              formattedAddress: p.vicinity || ''
+            };
+            createMarker(placeObj);
+            appendPlaceToList(placeObj, idx);
           });
         } else {
-          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">この周辺に該当するコンビニは見つかりませんでした。</li>';
+          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺にコンビニが見つかりませんでした。</li>';
         }
       });
     }
 
-    // 地図上にマーカーを生成
     function createMarker(place) {
       const marker = new google.maps.Marker({
         map: map,
-        position: place.geometry.location,
-        title: place.name
+        position: place.location,
+        title: place.displayName
       });
 
       marker.addListener('click', () => {
@@ -326,41 +354,31 @@
       markers.push(marker);
     }
 
-    // 店舗情報ウィンドウを表示
     function showInfoWindow(marker, place) {
-      const isOpen = place.opening_hours ? (place.opening_hours.open_now ? '<span style="color:green;">営業中</span>' : '<span style="color:red;">休業中</span>') : '営業時間情報なし';
+      const name = place.displayName || '';
+      const address = place.formattedAddress || '';
       const content = `
-        <div style="padding: 4px; font-size: 13px; max-width: 200px;">
-          <strong>${place.name}</strong><br>
-          <span style="color:#555;">${place.vicinity || ''}</span><br>
-          ${isOpen}
+        <div style="padding: 4px; font-size: 13px; max-width: 220px;">
+          <strong>${name}</strong><br>
+          <span style="color:#555;">${address}</span>
         </div>
       `;
       infoWindow.setContent(content);
       infoWindow.open(map, marker);
     }
 
-    // 一覧リストに追加
     function appendPlaceToList(place, index) {
       const list = document.getElementById('resultsList');
       const li = document.createElement('li');
       li.className = 'place-item';
 
-      let openStatusHtml = '';
-      if (place.opening_hours) {
-        openStatusHtml = place.opening_hours.open_now 
-          ? '<span class="place-status status-open">営業中</span>' 
-          : '<span class="place-status status-closed">休業中</span>';
-      }
-
       li.innerHTML = `
-        <div class="place-title">${place.name}</div>
-        <div class="place-vicinity">${place.vicinity || '住所情報なし'}</div>
-        ${openStatusHtml}
+        <div class="place-title">${place.displayName}</div>
+        <div class="place-vicinity">${place.formattedAddress || '住所情報なし'}</div>
       `;
 
       li.addEventListener('click', () => {
-        map.panTo(place.geometry.location);
+        map.panTo(place.location);
         if (markers[index]) {
           showInfoWindow(markers[index], place);
         }
@@ -369,16 +387,15 @@
       list.appendChild(li);
     }
 
-    // 既存マーカーのクリア
     function clearMarkers() {
       markers.forEach(m => m.setMap(null));
       markers = [];
     }
   </script>
 
-  <!-- Google Maps JavaScript APIの読み込み (Placesライブラリを指定) -->
+  <!-- Google Maps API 読み込み (Places New / Maps 統合) -->
   <script 
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&libraries=places&callback=initMap" 
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&v=weekly&libraries=places&callback=initMap" 
     async defer>
   </script>
 </body>
