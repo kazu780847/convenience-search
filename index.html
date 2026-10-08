@@ -86,11 +86,11 @@
       gap: 6px;
     }
     .chip {
-      padding: 4px 10px;
+      padding: 6px 14px;
       border-radius: 16px;
       border: 1px solid #ccc;
       background: #fff;
-      font-size: 12px;
+      font-size: 13px;
       cursor: pointer;
       color: #555;
     }
@@ -161,7 +161,6 @@
           <button class="chip" data-chain="セブン">セブン</button>
           <button class="chip" data-chain="ファミリーマート">ファミマ</button>
           <button class="chip" data-chain="ローソン">ローソン</button>
-          <button class="chip" data-chain="ミニストップ">ミニストップ</button>
         </div>
       </div>
       <ul class="results-list" id="resultsList">
@@ -272,7 +271,6 @@
       try {
         const { Place } = await google.maps.importLibrary("places");
         
-        // 検索クエリ: 各チェーン指定時はそのブランド名、すべて時は広く「コンビニ」
         let queryWord = currentChain === 'ALL' ? 'コンビニエンスストア' : currentChain;
         if (searchInput) {
           queryWord = searchInput + ' ' + queryWord;
@@ -294,19 +292,18 @@
         if (places && places.length > 0) {
           let displayPlaces = places;
 
-          // 1. 各チェーン指定時: 店舗名にキーワード（セブン/ファミリーマート/ローソン/ミニストップ）が含まれているか厳密判定
+          // 各チェーン指定時: 店舗名に指定キーワードが入っている店舗のみ抽出
           if (currentChain !== 'ALL') {
             displayPlaces = displayPlaces.filter(p => {
               const name = p.displayName || '';
               if (currentChain === 'セブン') return name.includes('セブン');
               if (currentChain === 'ファミリーマート') return name.includes('ファミリーマート') || name.includes('ファミマ');
               if (currentChain === 'ローソン') return name.includes('ローソン');
-              if (currentChain === 'ミニストップ') return name.includes('ミニストップ');
               return true;
             });
           }
 
-          // 2. 市区町村が入力されている場合の住所絞り込み
+          // 市区町村が入力されている場合の住所絞り込み
           if (searchInput) {
             const cleanKey = searchInput.replace(/(駅|市|町|村)$/, '');
             const filteredByArea = displayPlaces.filter(p => {
