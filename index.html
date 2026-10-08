@@ -124,20 +124,6 @@
       color: #666;
       margin-bottom: 4px;
     }
-    .place-status {
-      font-size: 12px;
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 3px;
-    }
-    .status-open {
-      background: #e6f4ea;
-      color: #137333;
-    }
-    .status-closed {
-      background: #fce8e6;
-      color: #c5221f;
-    }
     #map {
       flex: 1;
       height: 100%;
@@ -167,7 +153,7 @@
       <div class="search-panel">
         <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺を検索</button>
         <div class="input-group">
-          <input type="text" id="targetArea" placeholder="地名・駅名 (例: 蓮田駅, 渋谷駅)">
+          <input type="text" id="targetArea" placeholder="地名・駅名 (例: 白石駅, 蓮田駅)">
           <button id="btnAreaSearch">移動</button>
         </div>
         <div class="filter-chips">
@@ -190,19 +176,17 @@
 
   <script>
     let map;
+    let service;
+    let geocoder;
     let infoWindow;
     let markers = [];
     let currentKeyword = 'コンビニ';
     let searchTimeout = null;
-    let geocoder;
 
     const DEFAULT_LOCATION = { lat: 35.681236, lng: 139.767125 };
 
-    async function initMap() {
-      const { Map } = await google.maps.importLibrary("maps");
-      const { InfoWindow } = await google.maps.importLibrary("maps");
-
-      map = new Map(document.getElementById('map'), {
+    function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
         center: DEFAULT_LOCATION,
         zoom: 15,
         mapTypeControl: false,
@@ -210,14 +194,15 @@
         streetViewControl: false
       });
 
-      infoWindow = new InfoWindow();
+      infoWindow = new google.maps.InfoWindow();
       geocoder = new google.maps.Geocoder();
+      service = new google.maps.places.PlacesService(map);
 
       map.addListener('idle', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
           searchConvenienceStores();
-        }, 600);
+        }, 500);
       });
 
       setupEventListeners();
@@ -234,7 +219,7 @@
                 lng: pos.coords.longitude
               };
               map.setCenter(userLocation);
-              map.setZoom(16);
+              map.setZoom(15);
             },
             () => alert('現在地の取得に失敗しました。位置情報の利用を許可してください。')
           );
@@ -275,64 +260,25 @@
       });
     }
 
-    // 周辺検索処理 (Places API New / Place クラス対応)
-    async function searchConvenienceStores() {
+    // 周辺検索処理
+    function searchConvenienceStores() {
       clearMarkers();
       const resultsList = document.getElementById('resultsList');
       resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中...</li>';
 
-      try {
-        const { Place } = await google.maps.importLibrary("places");
-        const request = {
-          textQuery: currentKeyword === 'コンビニ' ? 'コンビニエンスストア' : currentKeyword,
-          fields: ['displayName', 'location', 'formattedAddress', 'regularOpeningHours'],
-          locationBias: {
-            center: map.getCenter(),
-            radius: 1200
-          },
-          maxResultCount: 20
-        };
-
-        const { places } = await Place.searchByText(request);
-
-        resultsList.innerHTML = '';
-        if (places && places.length > 0) {
-          places.forEach((place, index) => {
-            createMarker(place);
-            appendPlaceToList(place, index);
-          });
-        } else {
-          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺にコンビニが見つかりませんでした。</li>';
-        }
-      } catch (err) {
-        console.error(err);
-        // フォールバック: 従来型 PlacesService 呼び出し
-        fallbackSearch();
-      }
-    }
-
-    // 互換性フォールバック検索
-    function fallbackSearch() {
-      const resultsList = document.getElementById('resultsList');
-      const service = new google.maps.places.PlacesService(map);
       const request = {
         location: map.getCenter(),
-        radius: 1200,
+        radius: 1500,
         type: ['convenience_store'],
-        keyword: currentKeyword
+        keyword: currentKeyword === 'コンビニ' ? '' : currentKeyword
       };
 
       service.nearbySearch(request, (results, status) => {
         resultsList.innerHTML = '';
         if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-          results.forEach((p, idx) => {
-            const placeObj = {
-              displayName: p.name,
-              location: p.geometry.location,
-              formattedAddress: p.vicinity || ''
-            };
-            createMarker(placeObj);
-            appendPlaceToList(placeObj, idx);
+          results.forEach((place, index) => {
+            createMarker(place);
+            appendPlaceToList(place, index);
           });
         } else {
           resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺にコンビニが見つかりませんでした。</li>';
@@ -343,8 +289,8 @@
     function createMarker(place) {
       const marker = new google.maps.Marker({
         map: map,
-        position: place.location,
-        title: place.displayName
+        position: place.geometry.location,
+        title: place.name
       });
 
       marker.addListener('click', () => {
@@ -355,8 +301,8 @@
     }
 
     function showInfoWindow(marker, place) {
-      const name = place.displayName || '';
-      const address = place.formattedAddress || '';
+      const name = place.name || '';
+      const address = place.vicinity || '';
       const content = `
         <div style="padding: 4px; font-size: 13px; max-width: 220px;">
           <strong>${name}</strong><br>
@@ -373,12 +319,12 @@
       li.className = 'place-item';
 
       li.innerHTML = `
-        <div class="place-title">${place.displayName}</div>
-        <div class="place-vicinity">${place.formattedAddress || '住所情報なし'}</div>
+        <div class="place-title">${place.name}</div>
+        <div class="place-vicinity">${place.vicinity || '住所情報なし'}</div>
       `;
 
       li.addEventListener('click', () => {
-        map.panTo(place.location);
+        map.panTo(place.geometry.location);
         if (markers[index]) {
           showInfoWindow(markers[index], place);
         }
@@ -393,9 +339,9 @@
     }
   </script>
 
-  <!-- Google Maps API 読み込み (Places New / Maps 統合) -->
+  <!-- Google Maps API 読み込み -->
   <script 
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&v=weekly&libraries=places&callback=initMap" 
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&libraries=places&callback=initMap" 
     async defer>
   </script>
 </body>
