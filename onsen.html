@@ -161,12 +161,12 @@
           <button class="chip" data-keyword="日帰り温泉">日帰り温泉</button>
           <button class="chip" data-keyword="スーパー銭湯">スーパー銭湯</button>
           <button class="chip" data-keyword="足湯">足湯</button>
-          <button class="chip" data-keyword="公衆浴場 銭湯">共同浴場・銭湯</button>
+          <button class="chip" data-keyword="銭湯 共同浴場">共同浴場・銭湯</button>
         </div>
       </div>
       <ul class="results-list" id="resultsList">
         <li style="padding: 20px; text-align: center; color: #888;">
-          検索中...
+          検索したい駅名や温泉地を入力して「移動」を押してください。
         </li>
       </ul>
     </div>
@@ -181,13 +181,11 @@
     let infoWindow;
     let markers = [];
     let currentKeyword = '温泉';
-    let searchTimeout = null;
-
-    const DEFAULT_LOCATION = { lat: 35.681236, lng: 139.767125 };
+    let targetLocation = { lat: 40.8115, lng: 140.4468 }; // 初期位置: 五所川原駅
 
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
-        center: DEFAULT_LOCATION,
+        center: targetLocation,
         zoom: 13,
         mapTypeControl: false,
         fullscreenControl: true,
@@ -198,28 +196,26 @@
       geocoder = new google.maps.Geocoder();
       service = new google.maps.places.PlacesService(map);
 
-      map.addListener('idle', () => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-          searchBathSpots();
-        }, 500);
-      });
+      // 初回検索を実行
+      searchBathSpots();
 
       setupEventListeners();
     }
 
     function setupEventListeners() {
+      // 現在地検索
       document.getElementById('btnCurrentLocation').addEventListener('click', () => {
         document.getElementById('targetArea').value = '';
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
-              const userLocation = {
+              targetLocation = {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude
               };
-              map.setCenter(userLocation);
+              map.setCenter(targetLocation);
               map.setZoom(13);
+              searchBathSpots();
             },
             () => alert('現在地の取得に失敗しました。位置情報の利用を許可してください。')
           );
@@ -228,14 +224,17 @@
         }
       });
 
+      // エリア検索（移動ボタン）
       document.getElementById('btnAreaSearch').addEventListener('click', () => {
         const areaName = document.getElementById('targetArea').value.trim();
         if (!areaName) return;
 
         geocoder.geocode({ address: areaName }, (results, status) => {
           if (status === 'OK' && results[0]) {
-            map.setCenter(results[0].geometry.location);
+            targetLocation = results[0].geometry.location;
+            map.setCenter(targetLocation);
             map.setZoom(13);
+            searchBathSpots(); // 移動した目的地の周囲のみを検索
           } else {
             alert('場所が見つかりませんでした: ' + status);
           }
@@ -248,6 +247,7 @@
         }
       });
 
+      // カテゴリ切り替え
       document.querySelectorAll('.chip').forEach(button => {
         button.addEventListener('click', (e) => {
           document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
@@ -258,15 +258,15 @@
       });
     }
 
-    // 周辺検索処理（中心から半径5km以内を物理的に限定して検索）
+    // 周辺検索処理（指定地点 targetLocation から半径5km固定）
     function searchBathSpots() {
       clearMarkers();
       const resultsList = document.getElementById('resultsList');
-      resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺の温泉・温浴施設を検索中...</li>';
+      resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺の温泉を検索中...</li>';
 
       const request = {
-        location: map.getCenter(),
-        radius: 5000, // 中心から半径5km以内を厳格に指定（遠方飛び火を防止）
+        location: targetLocation, // 地図画面の中心ではなく、検索した地点を基準に固定
+        radius: 5000,             // 半径5km以内の施設だけを厳格に指定
         keyword: currentKeyword
       };
 
@@ -278,7 +278,7 @@
             appendPlaceToList(place, index);
           });
         } else {
-          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">半径5km以内に該当する温泉・温浴施設は見つかりませんでした。</li>';
+          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">指定地点から半径5km以内に温泉は見つかりませんでした。</li>';
         }
       });
     }
