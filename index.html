@@ -153,7 +153,7 @@
       <div class="search-panel">
         <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺を検索</button>
         <div class="input-group">
-          <input type="text" id="targetArea" placeholder="地名・駅名 (例: 白石駅, 蓮田駅)">
+          <input type="text" id="targetArea" placeholder="地名・市区町村名 (例: 伊奈町, 蓮田市)">
           <button id="btnAreaSearch">移動</button>
         </div>
         <div class="filter-chips">
@@ -188,7 +188,7 @@
     function initMap() {
       map = new google.maps.Map(document.getElementById('map'), {
         center: DEFAULT_LOCATION,
-        zoom: 15,
+        zoom: 14,
         mapTypeControl: false,
         fullscreenControl: true,
         streetViewControl: false
@@ -211,6 +211,7 @@
     function setupEventListeners() {
       // 現在地取得
       document.getElementById('btnCurrentLocation').addEventListener('click', () => {
+        document.getElementById('targetArea').value = '';
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
@@ -236,7 +237,7 @@
         geocoder.geocode({ address: areaName }, (results, status) => {
           if (status === 'OK' && results[0]) {
             map.setCenter(results[0].geometry.location);
-            map.setZoom(15);
+            map.setZoom(14);
           } else {
             alert('場所が見つかりませんでした: ' + status);
           }
@@ -260,15 +261,17 @@
       });
     }
 
-    // 周辺検索処理
+    // 周辺検索処理（指定地域フィルター付き）
     function searchConvenienceStores() {
       clearMarkers();
       const resultsList = document.getElementById('resultsList');
       resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中...</li>';
 
+      const searchInput = document.getElementById('targetArea').value.trim();
+
       const request = {
         location: map.getCenter(),
-        radius: 1500,
+        radius: 3000,
         type: ['convenience_store'],
         keyword: currentKeyword === 'コンビニ' ? '' : currentKeyword
       };
@@ -276,73 +279,9 @@
       service.nearbySearch(request, (results, status) => {
         resultsList.innerHTML = '';
         if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-          results.forEach((place, index) => {
-            createMarker(place);
-            appendPlaceToList(place, index);
-          });
-        } else {
-          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺にコンビニが見つかりませんでした。</li>';
-        }
-      });
-    }
+          
+          let displayResults = results;
 
-    function createMarker(place) {
-      const marker = new google.maps.Marker({
-        map: map,
-        position: place.geometry.location,
-        title: place.name
-      });
-
-      marker.addListener('click', () => {
-        showInfoWindow(marker, place);
-      });
-
-      markers.push(marker);
-    }
-
-    function showInfoWindow(marker, place) {
-      const name = place.name || '';
-      const address = place.vicinity || '';
-      const content = `
-        <div style="padding: 4px; font-size: 13px; max-width: 220px;">
-          <strong>${name}</strong><br>
-          <span style="color:#555;">${address}</span>
-        </div>
-      `;
-      infoWindow.setContent(content);
-      infoWindow.open(map, marker);
-    }
-
-    function appendPlaceToList(place, index) {
-      const list = document.getElementById('resultsList');
-      const li = document.createElement('li');
-      li.className = 'place-item';
-
-      li.innerHTML = `
-        <div class="place-title">${place.name}</div>
-        <div class="place-vicinity">${place.vicinity || '住所情報なし'}</div>
-      `;
-
-      li.addEventListener('click', () => {
-        map.panTo(place.geometry.location);
-        if (markers[index]) {
-          showInfoWindow(markers[index], place);
-        }
-      });
-
-      list.appendChild(li);
-    }
-
-    function clearMarkers() {
-      markers.forEach(m => m.setMap(null));
-      markers = [];
-    }
-  </script>
-
-  <!-- Google Maps API 読み込み -->
-  <script 
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&libraries=places&callback=initMap" 
-    async defer>
-  </script>
-</body>
-</html>
+          // 検索欄に入力がある場合、その地名（「駅」「市」「町」「村」を除去した語）で住所を絞り込む
+          if (searchInput) {
+            const filterKeyword = searchInput.
