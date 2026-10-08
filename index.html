@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>都道府県別 コンビニ店舗検索</title>
+  <style>
+    :root {
+      --primary: #1976d2;
+      --bg: #f5f7fa;
+      --card-bg: #ffffff;
+      --border: #e0e0e0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      margin: 0;
+      padding: 16px;
+      background-color: var(--bg);
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.4rem;
+      text-align: center;
+      margin-bottom: 20px;
+      color: #1a237e;
+    }
+    .search-card {
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      margin-bottom: 16px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+    select, input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    .chain-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chain-btn {
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .chain-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .result-info {
+      font-size: 0.9rem;
+      color: #666;
+      margin: 12px 4px;
+    }
+    .store-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .store-item {
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .badge-seven { background-color: #008054; }
+    .badge-lawson { background-color: #0068b7; }
+    .badge-famima { background-color: #009944; }
+    .badge-other { background-color: #757575; }
+    .store-name {
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .store-address {
+      font-size: 0.85rem;
+      color: #666;
+    }
+    .map-link {
+      background: #e3f2fd;
+      color: #1565c0;
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      white-space: nowrap;
+      margin-left: 12px;
+    }
+    .map-link:hover {
+      background: #bbdefb;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>全国コンビニ店舗ナビ</h1>
+
+  <div class="search-card">
+    <div class="form-group">
+      <label for="prefSelect">1. 都道府県を選択</label>
+      <select id="prefSelect">
+        <option value="埼玉県">埼玉県</option>
+        <option value="東京都">東京都</option>
+        <option value="神奈川県">神奈川県</option>
+        <option value="千葉県">千葉県</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>2. チェーンを選択</label>
+      <div class="chain-buttons" id="chainButtons">
+        <button class="chain-btn active" data-chain="">すべて</button>
+        <button class="chain-btn" data-chain="セブン-イレブン">セブン-イレブン</button>
+        <button class="chain-btn" data-chain="ファミリーマート">ファミリーマート</button>
+        <button class="chain-btn" data-chain="ローソン">ローソン</button>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label for="keywordInput">3. 市区町村・店舗名で絞り込み</label>
+      <input type="text" id="keywordInput" placeholder="例：蓮田、大宮、駅前...">
+    </div>
+  </div>
+
+  <div class="result-info" id="resultCount">検索結果：0件</div>
+
+  <ul class="store-list" id="storeList"></ul>
+</div>
+
+<script>
+  // サンプルデータ
+  const sampleStores = [
+    { name: "セブン-イレブン 蓮田駅東口店", chain: "セブン-イレブン", pref: "埼玉県", address: "埼玉県蓮田市本町1-1" },
+    { name: "ファミリーマート 蓮田駅西口店", chain: "ファミリーマート", pref: "埼玉県", address: "埼玉県蓮田市本町2-5" },
+    { name: "ローソン 蓮田見沼町店", chain: "ローソン", pref: "埼玉県", address: "埼玉県蓮田市見沼町15-3" },
+    { name: "セブン-イレブン 大宮駅東口店", chain: "セブン-イレブン", pref: "埼玉県", address: "埼玉県さいたま市大宮区大門町1-1" },
+    { name: "ファミリーマート 大宮駅北店", chain: "ファミリーマート", pref: "埼玉県", address: "埼玉県さいたま市大宮区錦町630" },
+    { name: "ローソン 新宿駅西口店", chain: "ローソン", pref: "東京都", address: "東京都新宿区西新宿1-1" },
+    { name: "セブン-イレブン 東京駅一番街店", chain: "セブン-イレブン", pref: "東京都", address: "東京都千代田区丸の内1-9-1" }
+  ];
+
+  let selectedChain = "";
+
+  const prefSelect = document.getElementById("prefSelect");
+  const keywordInput = document.getElementById("keywordInput");
+  const chainButtons = document.getElementById("chainButtons");
+  const storeList = document.getElementById("storeList");
+  const resultCount = document.getElementById("resultCount");
+
+  // チェーン切り替えボタン
+  chainButtons.addEventListener("click", (e) => {
+    if (e.target.classList.contains("chain-btn")) {
+      document.querySelectorAll(".chain-btn").forEach(btn => btn.classList.remove("active"));
+      e.target.classList.add("active");
+      selectedChain = e.target.dataset.chain;
+      filterStores();
+    }
+  });
+
+  prefSelect.addEventListener("change", filterStores);
+  keywordInput.addEventListener("input", filterStores);
+
+  function getBadgeClass(chain) {
+    if (chain.includes("セブン")) return "badge-seven";
+    if (chain.includes("ローソン")) return "badge-lawson";
+    if (chain.includes("ファミリーマート")) return "badge-famima";
+    return "badge-other";
+  }
+
+  function filterStores() {
+    const pref = prefSelect.value;
+    const keyword = keywordInput.value.trim().toLowerCase();
+
+    const filtered = sampleStores.filter(store => {
+      const matchPref = store.pref === pref;
+      const matchChain = !selectedChain || store.chain === selectedChain;
+      const matchKeyword = !keyword || 
+        store.name.toLowerCase().includes(keyword) || 
+        store.address.toLowerCase().includes(keyword);
+
+      return matchPref && matchChain && matchKeyword;
+    });
+
+    resultCount.textContent = `検索結果：${filtered.length}件`;
+    renderList(filtered);
+  }
+
+  function renderList(stores) {
+    storeList.innerHTML = "";
+    if (stores.length === 0) {
+      storeList.innerHTML = `<li style="text-align:center; padding: 20px; color:#888;">該当する店舗が見つかりませんでした。</li>`;
+      return;
+    }
+
+    stores.forEach(store => {
+      const li = document.createElement("li");
+      li.className = "store-item";
+      
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.name + " " + store.address)}`;
+
+      li.innerHTML = `
+        <div>
+          <span class="badge ${getBadgeClass(store.chain)}">${store.chain}</span>
+          <div class="store-name">${store.name}</div>
+          <div class="store-address">${store.address}</div>
+        </div>
+        <a href="${mapUrl}" target="_blank" rel="noopener" class="map-link">地図</a>
+      `;
+      storeList.appendChild(li);
+    });
+  }
+
+  // 初期読み込み実行
+  filterStores();
+</script>
+
+</body>
+</html>
