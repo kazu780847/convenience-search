@@ -153,20 +153,20 @@
       <div class="search-panel">
         <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺の温泉を検索</button>
         <div class="input-group">
-          <input type="text" id="targetArea" placeholder="地名・駅名・温泉地 (例: 五所川原駅, 草津温泉)">
+          <input type="text" id="targetArea" value="五所川原駅" placeholder="地名・駅名・温泉地 (例: 五所川原駅, 草津温泉)">
           <button id="btnAreaSearch">移動</button>
         </div>
         <div class="filter-chips">
-          <button class="chip active" data-keyword="温泉">すべて</button>
-          <button class="chip" data-keyword="日帰り温泉">日帰り温泉</button>
-          <button class="chip" data-keyword="スーパー銭湯">スーパー銭湯</button>
-          <button class="chip" data-keyword="足湯">足湯</button>
-          <button class="chip" data-keyword="銭湯 共同浴場">共同浴場・銭湯</button>
+          <button class="chip active" data-query="温泉 銭湯 立ち寄り湯">すべて</button>
+          <button class="chip" data-query="日帰り温泉">日帰り温泉</button>
+          <button class="chip" data-query="スーパー銭湯">スーパー銭湯</button>
+          <button class="chip" data-query="足湯">足湯</button>
+          <button class="chip" data-query="共同浴場 銭湯">共同浴場</button>
         </div>
       </div>
       <ul class="results-list" id="resultsList">
         <li style="padding: 20px; text-align: center; color: #888;">
-          検索したい駅名や温泉地を入力して「移動」を押してください。
+          検索中...
         </li>
       </ul>
     </div>
@@ -176,30 +176,28 @@
 
   <script>
     let map;
-    let service;
-    let geocoder;
     let infoWindow;
     let markers = [];
-    let currentKeyword = '温泉';
-    let targetLocation = { lat: 40.8115, lng: 140.4468 }; // 初期位置: 五所川原駅
+    let currentQuery = '温泉 銭湯 立ち寄り湯';
+    let currentCenter = { lat: 40.8115, lng: 140.4468 }; // 五所川原駅
+    let geocoder;
 
-    function initMap() {
-      map = new google.maps.Map(document.getElementById('map'), {
-        center: targetLocation,
+    async function initMap() {
+      const { Map, InfoWindow } = await google.maps.importLibrary("maps");
+
+      map = new Map(document.getElementById('map'), {
+        center: currentCenter,
         zoom: 13,
         mapTypeControl: false,
         fullscreenControl: true,
         streetViewControl: false
       });
 
-      infoWindow = new google.maps.InfoWindow();
+      infoWindow = new InfoWindow();
       geocoder = new google.maps.Geocoder();
-      service = new google.maps.places.PlacesService(map);
-
-      // 初回検索を実行
-      searchBathSpots();
 
       setupEventListeners();
+      searchBathSpots();
     }
 
     function setupEventListeners() {
@@ -209,11 +207,11 @@
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
-              targetLocation = {
+              currentCenter = {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude
               };
-              map.setCenter(targetLocation);
+              map.setCenter(currentCenter);
               map.setZoom(13);
               searchBathSpots();
             },
@@ -224,17 +222,17 @@
         }
       });
 
-      // エリア検索（移動ボタン）
+      // エリア検索
       document.getElementById('btnAreaSearch').addEventListener('click', () => {
         const areaName = document.getElementById('targetArea').value.trim();
         if (!areaName) return;
 
         geocoder.geocode({ address: areaName }, (results, status) => {
           if (status === 'OK' && results[0]) {
-            targetLocation = results[0].geometry.location;
-            map.setCenter(targetLocation);
+            currentCenter = results[0].geometry.location;
+            map.setCenter(currentCenter);
             map.setZoom(13);
-            searchBathSpots(); // 移動した目的地の周囲のみを検索
+            searchBathSpots();
           } else {
             alert('場所が見つかりませんでした: ' + status);
           }
@@ -252,42 +250,90 @@
         button.addEventListener('click', (e) => {
           document.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
           e.target.classList.add('active');
-          currentKeyword = e.target.getAttribute('data-keyword');
+          currentQuery = e.target.getAttribute('data-query');
           searchBathSpots();
         });
       });
     }
 
-    // 周辺検索処理（指定地点 targetLocation から半径5km固定）
-    function searchBathSpots() {
+    // 2点間の直線距離（km）を計算
+    function getDistanceKm(lat1, lng1, lat2, lng2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // 周辺検索処理
+    async function searchBathSpots() {
       clearMarkers();
       const resultsList = document.getElementById('resultsList');
       resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺の温泉を検索中...</li>';
 
-      const request = {
-        location: targetLocation, // 地図画面の中心ではなく、検索した地点を基準に固定
-        radius: 5000,             // 半径5km以内の施設だけを厳格に指定
-        keyword: currentKeyword
-      };
+      const searchInput = document.getElementById('targetArea').value.trim();
 
-      service.nearbySearch(request, (results, status) => {
-        resultsList.innerHTML = '';
-        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-          results.forEach((place, index) => {
-            createMarker(place);
-            appendPlaceToList(place, index);
-          });
-        } else {
-          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">指定地点から半径5km以内に温泉は見つかりませんでした。</li>';
+      try {
+        const { Place } = await google.maps.importLibrary("places");
+
+        // 検索枠に地名がある場合はキーワードに結合して確実にその周辺を引き当てる
+        let fullQuery = currentQuery;
+        if (searchInput) {
+          fullQuery = searchInput + ' ' + currentQuery;
         }
-      });
+
+        const request = {
+          textQuery: fullQuery,
+          fields: ['displayName', 'location', 'formattedAddress'],
+          locationBias: {
+            center: currentCenter,
+            radius: 5000
+          },
+          maxResultCount: 20
+        };
+
+        const { places } = await Place.searchByText(request);
+
+        resultsList.innerHTML = '';
+        if (places && places.length > 0) {
+          // 基準地点の緯度経度
+          const baseLat = typeof currentCenter.lat === 'function' ? currentCenter.lat() : currentCenter.lat;
+          const baseLng = typeof currentCenter.lng === 'function' ? currentCenter.lng() : currentCenter.lng;
+
+          // 基準地点から8km以内の施設だけに厳格フィルタリング（弘前などの遠方を足切り）
+          const filteredPlaces = places.filter(place => {
+            if (!place.location) return false;
+            const pLat = place.location.lat();
+            const pLng = place.location.lng();
+            const dist = getDistanceKm(baseLat, baseLng, pLat, pLng);
+            return dist <= 8.0; // 8km以内
+          });
+
+          if (filteredPlaces.length > 0) {
+            filteredPlaces.forEach((place, index) => {
+              createMarker(place);
+              appendPlaceToList(place, index);
+            });
+          } else {
+            resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">指定地点の近郊（8km圏内）に該当する温泉は見つかりませんでした。</li>';
+          }
+        } else {
+          resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">周辺に温泉は見つかりませんでした。</li>';
+        }
+      } catch (err) {
+        console.error(err);
+        resultsList.innerHTML = '<li style="padding: 20px; text-align: center; color: #888;">検索中にエラーが発生しました。</li>';
+      }
     }
 
     function createMarker(place) {
       const marker = new google.maps.Marker({
         map: map,
-        position: place.geometry.location,
-        title: place.name
+        position: place.location,
+        title: place.displayName
       });
 
       marker.addListener('click', () => {
@@ -298,8 +344,8 @@
     }
 
     function showInfoWindow(marker, place) {
-      const name = place.name || '';
-      const address = place.vicinity || '';
+      const name = place.displayName || '';
+      const address = place.formattedAddress || '';
       const content = `
         <div style="padding: 6px; font-size: 13px; max-width: 240px;">
           <strong style="color: #1a446c;">♨️ ${name}</strong><br>
@@ -316,12 +362,12 @@
       li.className = 'place-item';
 
       li.innerHTML = `
-        <div class="place-title">♨️ ${place.name}</div>
-        <div class="place-vicinity">${place.vicinity || '住所情報なし'}</div>
+        <div class="place-title">♨️ ${place.displayName}</div>
+        <div class="place-vicinity">${place.formattedAddress || '住所情報なし'}</div>
       `;
 
       li.addEventListener('click', () => {
-        map.panTo(place.geometry.location);
+        map.panTo(place.location);
         if (markers[index]) {
           showInfoWindow(markers[index], place);
         }
@@ -338,7 +384,7 @@
 
   <!-- Google Maps API 読み込み -->
   <script 
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&libraries=places&callback=initMap" 
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&v=weekly&libraries=places&callback=initMap" 
     async defer>
   </script>
 </body>
