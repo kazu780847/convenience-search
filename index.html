@@ -146,7 +146,7 @@
       flex: 1;
       height: 100%;
     }
-    /* レスポンシブ対応 (画面幅が狭い場合) */
+    /* レスポンシブ対応 */
     @media (max-width: 768px) {
       .container {
         flex-direction: column-reverse;
@@ -173,7 +173,7 @@
       <div class="search-panel">
         <button id="btnCurrentLocation" class="btn-current">📍 現在地周辺を検索</button>
         <div class="input-group">
-          <input type="text" id="targetArea" placeholder="地名・市区町村名 (例: 渋谷駅, 梅田)">
+          <input type="text" id="targetArea" placeholder="地名・駅名 (例: 蓮田駅, 渋谷駅)">
           <button id="btnAreaSearch">移動</button>
         </div>
         <div class="filter-chips">
@@ -198,6 +198,7 @@
   <script>
     let map;
     let service;
+    let geocoder;
     let infoWindow;
     let markers = [];
     let currentKeyword = 'コンビニ';
@@ -217,8 +218,9 @@
 
       infoWindow = new google.maps.InfoWindow();
       service = new google.maps.places.PlacesService(map);
+      geocoder = new google.maps.Geocoder();
 
-      // 地図のドラッグ・ズーム停止時に動的再検索 (負荷軽減のためデバウンス処理)
+      // 地図の停止時に自動検索
       map.addListener('idle', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
@@ -250,20 +252,26 @@
         }
       });
 
-      // エリア名・地名での移動検索 (Geocoding API不要のTextSearchを使用)
+      // エリア名・地名での移動検索 (Geocoding APIを使用)
       document.getElementById('btnAreaSearch').addEventListener('click', () => {
         const areaName = document.getElementById('targetArea').value.trim();
         if (!areaName) return;
 
-        const request = { query: areaName, fields: ['geometry'] };
-        service.findPlaceFromQuery(request, (results, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && results[0]) {
+        geocoder.geocode({ address: areaName }, (results, status) => {
+          if (status === 'OK' && results[0]) {
             map.setCenter(results[0].geometry.location);
             map.setZoom(15);
           } else {
-            alert('指定の場所が見つかりませんでした。');
+            alert('場所の検索に失敗しました。 (ステータス: ' + status + ')');
           }
         });
+      });
+
+      // Enterキーでも検索可能に
+      document.getElementById('targetArea').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          document.getElementById('btnAreaSearch').click();
+        }
       });
 
       // チェーン別フィルター
@@ -285,14 +293,14 @@
 
       const request = {
         location: map.getCenter(),
-        radius: 1200, // 検索半径 (メートル単位)
+        radius: 1200,
         type: ['convenience_store'],
         keyword: currentKeyword
       };
 
       service.nearbySearch(request, (results, status) => {
         resultsList.innerHTML = '';
-        if (status === google.maps.places.PlacesServiceStatus.OK && results.length > 0) {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
           results.forEach((place, index) => {
             createMarker(place);
             appendPlaceToList(place, index);
@@ -351,7 +359,6 @@
         ${openStatusHtml}
       `;
 
-      // リスト項目クリックで該当マーカーへフォーカス
       li.addEventListener('click', () => {
         map.panTo(place.geometry.location);
         if (markers[index]) {
@@ -370,14 +377,9 @@
   </script>
 
   <!-- Google Maps JavaScript APIの読み込み (Placesライブラリを指定) -->
-  <!-- ※ YOUR_API_KEY を取得済みのGoogle Maps APIキーに置き換えてください -->
-  <!-- Google Maps JavaScript APIの読み込み (Places, Geocodingライブラリを指定) -->
-<script 
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&libraries=places,geocoding&callback=initMap" 
-  async defer>
-</script>
-
-
-
+  <script 
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBshhm0vyHnSf2Y9ttwZk_fBa8N9cEW8Cg&libraries=places&callback=initMap" 
+    async defer>
+  </script>
 </body>
 </html>
