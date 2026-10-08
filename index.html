@@ -172,11 +172,10 @@
   <ul class="store-list" id="storeList"></ul>
 </div>
 
-<!-- 外部JSファイルとして安全・高速に店舗データを読み込み -->
+<!-- ここで saitama.js を読み込みます -->
 <script src="saitama.js"></script>
 
 <script>
-  // saitama.js からデータを取得
   let currentStores = window.SAITAMA_STORES || [];
   let selectedChain = "";
 
