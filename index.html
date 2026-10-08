@@ -75,6 +75,8 @@
       font-size: 0.9rem;
       color: #666;
       margin: 12px 4px;
+      display: flex;
+      justify-content: space-between;
     }
     .store-list {
       list-style: none;
@@ -103,6 +105,7 @@
     .badge-seven { background-color: #008054; }
     .badge-lawson { background-color: #0068b7; }
     .badge-famima { background-color: #009944; }
+    .badge-ministop { background-color: #003e8a; }
     .badge-other { background-color: #757575; }
     .store-name {
       font-size: 1rem;
@@ -127,6 +130,11 @@
     .map-link:hover {
       background: #bbdefb;
     }
+    .loading {
+      text-align: center;
+      padding: 30px;
+      color: #888;
+    }
   </style>
 </head>
 <body>
@@ -138,10 +146,9 @@
     <div class="form-group">
       <label for="prefSelect">1. 都道府県を選択</label>
       <select id="prefSelect">
-        <option value="埼玉県">埼玉県</option>
-        <option value="東京都">東京都</option>
-        <option value="神奈川県">神奈川県</option>
-        <option value="千葉県">千葉県</option>
+        <option value="saitama">埼玉県</option>
+        <option value="tokyo" disabled>東京都 (準備中)</option>
+        <option value="kanagawa" disabled>神奈川県 (準備中)</option>
       </select>
     </div>
 
@@ -152,32 +159,28 @@
         <button class="chain-btn" data-chain="セブン-イレブン">セブン-イレブン</button>
         <button class="chain-btn" data-chain="ファミリーマート">ファミリーマート</button>
         <button class="chain-btn" data-chain="ローソン">ローソン</button>
+        <button class="chain-btn" data-chain="ミニストップ">ミニストップ</button>
       </div>
     </div>
 
     <div class="form-group" style="margin-bottom: 0;">
       <label for="keywordInput">3. 市区町村・店舗名で絞り込み</label>
-      <input type="text" id="keywordInput" placeholder="例：蓮田、大宮、駅前...">
+      <input type="text" id="keywordInput" placeholder="例：蓮田、大宮、駅前、川越...">
     </div>
   </div>
 
-  <div class="result-info" id="resultCount">検索結果：0件</div>
+  <div class="result-info">
+    <span id="resultCount">読み込み中...</span>
+    <span id="totalCount"></span>
+  </div>
 
-  <ul class="store-list" id="storeList"></ul>
+  <ul class="store-list" id="storeList">
+    <li class="loading">店舗データを読み込んでいます...</li>
+  </ul>
 </div>
 
 <script>
-  // サンプルデータ
-  const sampleStores = [
-    { name: "セブン-イレブン 蓮田駅東口店", chain: "セブン-イレブン", pref: "埼玉県", address: "埼玉県蓮田市本町1-1" },
-    { name: "ファミリーマート 蓮田駅西口店", chain: "ファミリーマート", pref: "埼玉県", address: "埼玉県蓮田市本町2-5" },
-    { name: "ローソン 蓮田見沼町店", chain: "ローソン", pref: "埼玉県", address: "埼玉県蓮田市見沼町15-3" },
-    { name: "セブン-イレブン 大宮駅東口店", chain: "セブン-イレブン", pref: "埼玉県", address: "埼玉県さいたま市大宮区大門町1-1" },
-    { name: "ファミリーマート 大宮駅北店", chain: "ファミリーマート", pref: "埼玉県", address: "埼玉県さいたま市大宮区錦町630" },
-    { name: "ローソン 新宿駅西口店", chain: "ローソン", pref: "東京都", address: "東京都新宿区西新宿1-1" },
-    { name: "セブン-イレブン 東京駅一番街店", chain: "セブン-イレブン", pref: "東京都", address: "東京都千代田区丸の内1-9-1" }
-  ];
-
+  let currentStores = [];
   let selectedChain = "";
 
   const prefSelect = document.getElementById("prefSelect");
@@ -185,8 +188,30 @@
   const chainButtons = document.getElementById("chainButtons");
   const storeList = document.getElementById("storeList");
   const resultCount = document.getElementById("resultCount");
+  const totalCount = document.getElementById("totalCount");
 
-  // チェーン切り替えボタン
+  // 都道府県データファイルの読み込み
+  function loadPrefData(prefKey) {
+    storeList.innerHTML = `<li class="loading">店舗データを読み込んでいます...</li>`;
+    resultCount.textContent = "読み込み中...";
+
+    fetch(`${prefKey}.json`)
+      .then(res => {
+        if (!res.ok) throw new Error("データの取得に失敗しました");
+        return res.json();
+      })
+      .then(data => {
+        currentStores = data;
+        totalCount.textContent = `(総店舗数: ${data.length}件)`;
+        filterStores();
+      })
+      .catch(err => {
+        storeList.innerHTML = `<li class="loading" style="color:red;">データの読み込みに失敗しました。</li>`;
+        resultCount.textContent = "エラー";
+      });
+  }
+
+  // チェーン選択切り替え
   chainButtons.addEventListener("click", (e) => {
     if (e.target.classList.contains("chain-btn")) {
       document.querySelectorAll(".chain-btn").forEach(btn => btn.classList.remove("active"));
@@ -196,28 +221,31 @@
     }
   });
 
-  prefSelect.addEventListener("change", filterStores);
+  prefSelect.addEventListener("change", () => {
+    loadPrefData(prefSelect.value);
+  });
+
   keywordInput.addEventListener("input", filterStores);
 
   function getBadgeClass(chain) {
     if (chain.includes("セブン")) return "badge-seven";
     if (chain.includes("ローソン")) return "badge-lawson";
     if (chain.includes("ファミリーマート")) return "badge-famima";
+    if (chain.includes("ミニストップ")) return "badge-ministop";
     return "badge-other";
   }
 
   function filterStores() {
-    const pref = prefSelect.value;
     const keyword = keywordInput.value.trim().toLowerCase();
 
-    const filtered = sampleStores.filter(store => {
-      const matchPref = store.pref === pref;
+    const filtered = currentStores.filter(store => {
       const matchChain = !selectedChain || store.chain === selectedChain;
       const matchKeyword = !keyword || 
         store.name.toLowerCase().includes(keyword) || 
+        (store.city && store.city.toLowerCase().includes(keyword)) ||
         store.address.toLowerCase().includes(keyword);
 
-      return matchPref && matchChain && matchKeyword;
+      return matchChain && matchKeyword;
     });
 
     resultCount.textContent = `検索結果：${filtered.length}件`;
@@ -249,8 +277,8 @@
     });
   }
 
-  // 初期読み込み実行
-  filterStores();
+  // 初期読み込み（埼玉県）
+  loadPrefData("saitama");
 </script>
 
 </body>
